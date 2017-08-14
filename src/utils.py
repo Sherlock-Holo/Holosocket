@@ -73,3 +73,28 @@ def gen_response(Sec_WebSocket_Key):
     data += b'Connection: Upgrade\r\n'
     data += b'Sec-WebSocket-Accept: ' + Sec_WebSocket_Key
     return data
+
+
+def mask(data, mask_key=None):
+    if not mask_key:
+        mask_key = secrets.token_bytes(4)
+    new = []
+
+    for i, d in enumerate(data):
+        new.append(struct.pack('>B', d ^ mask_key[i % 4]))
+
+    new_data = b''.join(new)
+    return new_data, mask_key
+
+
+def gen_local_frame(content):
+    data = struct.pack('>B', 1 << 7 | 2)
+    prefix, content_len = gen_data_len(True, content)
+    if content_len == 0:
+        data += prefix
+    else:
+        data += prefix + content_len
+
+    content, mask_key = mask(content)
+    data += mask_key + content
+    return data
