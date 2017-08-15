@@ -98,3 +98,15 @@ def gen_local_frame(content):
     content, mask_key = mask(content)
     data += mask_key + content
     return data
+
+
+def gen_server_frame(content):
+    data = struct.pack('>B', 1 << 7 | 2)
+    prefix, content_len = gen_data_len(False, content)
+    if content_len == 0:
+        data += prefix
+    else:
+        data += prefix + content_len
+
+    data += content
+    return data
