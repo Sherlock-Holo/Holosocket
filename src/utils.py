@@ -110,3 +110,15 @@ def gen_server_frame(content):
 
     data += content
     return data
+
+
+def gen_close_frame(mask):
+    if mask:
+        data = struct.pack('>B', 1 << 7 | 8)
+        data += struct.pack('>B', 1 << 7)
+
+    else:
+        data = struct.pack('>B', 1 << 7 | 8)
+        data += struct.pack('>B', 0)
+
+    return data
