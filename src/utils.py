@@ -38,11 +38,11 @@ def gen_data_len(mask_flag, data):
             return prefix, data_len
 
 
-def gen_request(addr):
+def gen_request(addr, port):
     Sec_WebSocket_Key = secrets.token_urlsafe(16)
     Sec_WebSocket_Key = base64.b64encode(Sec_WebSocket_Key.encode())
     data = b'GET /chat HTTP/1.1\r\n'
-    data += b'Host: ' + addr.encode() + b':8000\r\n'
+    data += b'Host: ' + addr.encode() + str(port).encode() + b'\r\n'
     data += b'Upgrade: websocket\r\n'
     data += b'Connection: Upgrade\r\n'
     data += b'Sec-WebSocket-Key: ' + Sec_WebSocket_Key + b'\r\n'
@@ -71,7 +71,7 @@ def gen_response(Sec_WebSocket_Key):
     data = b'HTTP/1.1 101 Switching Protocols\r\n'
     data += b'Upgrade: websocket\r\n'
     data += b'Connection: Upgrade\r\n'
-    data += b'Sec-WebSocket-Accept: ' + Sec_WebSocket_Key
+    data += b'Sec-WebSocket-Accept: ' + Sec_WebSocket_Key + b'\r\n\r\n'
     return data
 
 
@@ -121,4 +121,24 @@ def gen_close_frame(mask):
         data = struct.pack('>B', 1 << 7 | 8)
         data += struct.pack('>B', 0)
 
+    return data
+
+
+def certificate(header, addr, port):
+    if header['Host'] != b':'.join([addr.encode(), port.encode()]):
+        return False
+    elif header['Upgrade'] != b'websocket':
+        return False
+    elif header['Connection'] != b'Upgrade':
+        return False
+    elif header['Sec-WebSocket-Version'] != b'13':
+        return False
+
+    else:
+        return True
+
+
+def not_found():
+    data = b'HTTP/1.1 404 Not Found\r\n'
+    data += b'Connection: Closed\r\n\r\n'
     return data
