@@ -41,7 +41,7 @@ class aes_cfb:
 
 
 class aes_gcm:
-    def __init__(self, key, salt=None, nonce=None):
+    def __init__(self, key, salt=None):
         '''Create a new AES-GCM cipher.
 
         key: Your password like: passw0rd
