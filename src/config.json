@@ -2,5 +2,6 @@
 	"server": "121.42.26.187",
 	"server_port": 1088,
 	"local_port": 1089,
-	"password": "test"
+	"password": "test",
+    "auth_addr": "www.bing.com"
 }
