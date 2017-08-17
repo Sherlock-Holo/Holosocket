@@ -18,6 +18,7 @@ logging.basicConfig(level=logging.DEBUG,
 
 
 class Remote(asyncio.Protocol):
+
     def connection_made(self, transport):
         self.transport = transport
         self.server_transport = None
@@ -28,7 +29,11 @@ class Remote(asyncio.Protocol):
 
 
 class Server(asyncio.Protocol):
-    HANDSHAKE, SALT, RELAY = range(3)
+    HANDSHAKE, SALT, TARGET, RELAY = range(4)
+
+    def clean_buffer(self):
+        self.data_len = 0
+        self.data_buf = b''
 
     def connection_made(self, transport):
         client_info = transport.get_extra_info('peername')
@@ -61,6 +66,72 @@ class Server(asyncio.Protocol):
 
             response = utils.gen_response(header['Sec-WebSocket-Key'])
             self.transport.write(response)
+            self.state = self.SALT
+            self.clean_buffer()
+
+        elif self.state == self.SALT:
+            self.data_buf += data
+            self.data_len += len(data)
+            """if self.data_len < 2:
+                return None
+            else:
+                payload_len1 = self.data_buf[1] & 0x7f
+                if payload_len1 <= 125:
+                    payload_len = payload_len1
+                    continue_read = 0
+
+                elif payload_len1 == 126:
+                    if self.data_len < 4:
+                        return None
+                    else:
+                        payload_len = struct.unpack('>H', self.data_buf[2:4])
+                        continue_read = 2
+
+                elif payload_len1 == 127:
+                    if self.data_len < 10:
+                        return None
+                    else:
+                        payload_len = struct.unpack('>Q', self.data_buf[2:10])
+                        continue_read = 8
+
+            if self.data_len < 2 + continue_read + 4:
+                return None
+            else:
+                mask_key = self.data_buf[2 + continue_read:6 + continue_read]
+
+            if self.data_len < 2 + continue_read + 4 + payload_len:
+                return None
+            else:
+                salt = data_buf[5 + continue_read:
+                                5 + continue_read + payload_len]"""
+
+            if utils.get_content(self.data_buf, self.data_len, True):
+                salt = utils.get_content(self.data_buf, self.data_len, True)
+            else:
+                return None
+
+                self.Encrypt = aes_gcm(KEY, salt)
+                self.Decrypt = aes_gcm(KEY, salt)
+
+            self.data_buf = self.data_buf[5 + continue_read + payload_len:]
+            self.data_len = len(self.data_buf)
+            self.state = self.TARGET
+
+        elif self.state == self.TARGET:
+            self.data_buf += data
+            self.data_len += len(data)
+            if utils.get_content(self.data_buf, self.data_len, True):
+                content = utils.get_content(self.data_buf, self.data_len, True)
+            else:
+                return None
+
+            target = content[:-16]
+            tag = content[-16:]
+            try:
+                target = self.Decrypt.decrypt(target, tag)
+            except ValueError:
+                self.transport.close()
+                return None
 
 
 if __name__ == '__main__':

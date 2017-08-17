@@ -18,16 +18,23 @@ logging.basicConfig(level=logging.DEBUG,
 
 
 class Remote(asyncio.Protocol):
-    HANDSHAKE, SALT, RELAY = range(3)
+    HANDSHAKE, RELAY = range(2)
+
+    def clean_buffer(self):
+        self.data_len = 0
+        self.data_buf = b''
 
     def connection_made(self, transport):
         self.transport = transport
         self.server_transport = None
+        self.Ecrypt = None
         self.Decrypt = None
         self.Sec_WebSocket_Key = None
         self.state = self.HANDSHAKE
         self.data_len = 0
         self.data_buf = b''
+        self.salt = None
+        self.target = None
 
     def data_received(self, data):
         if self.state == self.HANDSHAKE:
@@ -42,11 +49,21 @@ class Remote(asyncio.Protocol):
             else:
                 return None
 
-            if utils.certificate_key(self.Sec_WebSocket_Key,
-                                     header['Sec_WebSocket_Key']):
-                self.state = self.SALT
-            else:
+            if not utils.certificate_key(self.Sec_WebSocket_Key,
+                                         header['Sec_WebSocket_Key']):
                 self.transport.close()
+            else:
+                self.state = self.RELAY
+                self.transport.write(utils.gen_local_frame(self.salt)
+                target, tag = self.Encrypt.encrypt(self.target)
+                self.transport.write(utils.gen_local_frame(target + tag))
+                socks_reponse =  b'\x05\x00\x00\x01'
+                socks_reponse += socket.inet_aton('0.0.0.0')
+                socks_reponse += struct.pack('>H', 0)
+                self.server_transport.write(socks_reponse)
+
+        elif self.state == self.RELAY:
+
 
 
 class Server(asyncio.Protocol):
@@ -153,8 +170,11 @@ class Server(asyncio.Protocol):
     async def connect(self, addr, port, target):
         loop = asyncio.get_event_loop()
         transport, remote = await loop.create_connection(Remote, addr, port)
+        remote.target = target
         remote.server_transport = self.transport
+        remote.Encrypt = self.Encrypt
         remote.Decrypt = self.Decrypt
+        remote.salt = self.salt
         self.remote_transport = transport
         handshake, remote.Sec_WebSocket_Key = utils.gen_request(AUTH,
                                                                 SERVER_PORT)
