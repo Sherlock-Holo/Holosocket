@@ -144,11 +144,11 @@ def not_found():
     return data
 
 
-def get_content(data_buf, data_len, mask):
+def get_content(data_buf, data_len, mask_flag):
     if data_len < 2:
         return False
     else:
-        if mask:
+        if mask_flag:
             payload_len1 = data_buf[1] & 0x7f
         else:
             payload_len1 = data_buf[1]
@@ -180,5 +180,6 @@ def get_content(data_buf, data_len, mask):
         return False
     else:
         content = data_buf[5 + continue_read:5 + continue_read + payload_len]
+        content = mask(content, mask_key)[0]
 
     return content, continue_read, payload_len

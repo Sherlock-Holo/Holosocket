@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import json
 import logging
-import socket
+#import socket
 import struct
 
 import utils
@@ -160,15 +160,15 @@ class Server(asyncio.Protocol):
                 content, continue_read, payload_len = utils.get_content(self.data_buf,
                                                                         self.data_len,
                                                                         True)
-                tag = connect[-16:]
-                connect = [:-16]
+                tag = content[-16:]
+                content = content[:-16]
                 try:
-                    content = self.Decrypt.decrypt(connect, tag)
+                    content = self.Decrypt.decrypt(content, tag)
                 except ValueError:
                     self.transport.close()
                     return None
 
-                self.remote_transport.write(connect)
+                self.remote_transport.write(content)
 
                 self.data_buf = self.data_buf[5 + continue_read + payload_len:]
                 self.data_len = len(self.data_buf)

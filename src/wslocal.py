@@ -54,10 +54,10 @@ class Remote(asyncio.Protocol):
                 self.transport.close()
             else:
                 self.state = self.RELAY
-                self.transport.write(utils.gen_local_frame(self.salt)
+                self.transport.write(utils.gen_local_frame(self.salt))
                 target, tag = self.Encrypt.encrypt(self.target)
                 self.transport.write(utils.gen_local_frame(target + tag))
-                socks_reponse =  b'\x05\x00\x00\x01'
+                socks_reponse = b'\x05\x00\x00\x01'
                 socks_reponse += socket.inet_aton('0.0.0.0')
                 socks_reponse += struct.pack('>H', 0)
                 self.server_transport.write(socks_reponse)
