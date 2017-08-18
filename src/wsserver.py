@@ -22,14 +22,17 @@ class Remote(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.server_transport = None
+        self.Encrypt = None
         self.Decrypt = None
 
     def data_received(self, data):
-        pass
+        content, tag = self.Encrypt.encrypt(data)
+        content = utils.gen_server_frame(content + tag)
+        self.server_transport.write(content)
 
 
 class Server(asyncio.Protocol):
-    HANDSHAKE, SALT, TARGET, RELAY = range(4)
+    HANDSHAKE, SALT, TARGET, CONNECTING, RELAY = range(5)
 
     def clean_buffer(self):
         self.data_len = 0
@@ -72,41 +75,11 @@ class Server(asyncio.Protocol):
         elif self.state == self.SALT:
             self.data_buf += data
             self.data_len += len(data)
-            """if self.data_len < 2:
-                return None
-            else:
-                payload_len1 = self.data_buf[1] & 0x7f
-                if payload_len1 <= 125:
-                    payload_len = payload_len1
-                    continue_read = 0
-
-                elif payload_len1 == 126:
-                    if self.data_len < 4:
-                        return None
-                    else:
-                        payload_len = struct.unpack('>H', self.data_buf[2:4])
-                        continue_read = 2
-
-                elif payload_len1 == 127:
-                    if self.data_len < 10:
-                        return None
-                    else:
-                        payload_len = struct.unpack('>Q', self.data_buf[2:10])
-                        continue_read = 8
-
-            if self.data_len < 2 + continue_read + 4:
-                return None
-            else:
-                mask_key = self.data_buf[2 + continue_read:6 + continue_read]
-
-            if self.data_len < 2 + continue_read + 4 + payload_len:
-                return None
-            else:
-                salt = data_buf[5 + continue_read:
-                                5 + continue_read + payload_len]"""
 
             if utils.get_content(self.data_buf, self.data_len, True):
-                salt = utils.get_content(self.data_buf, self.data_len, True)
+                salt, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                     self.data_len,
+                                                                     True)
             else:
                 return None
 
@@ -121,7 +94,9 @@ class Server(asyncio.Protocol):
             self.data_buf += data
             self.data_len += len(data)
             if utils.get_content(self.data_buf, self.data_len, True):
-                content = utils.get_content(self.data_buf, self.data_len, True)
+                content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                        self.data_len,
+                                                                        True)
             else:
                 return None
 
@@ -130,8 +105,74 @@ class Server(asyncio.Protocol):
             try:
                 target = self.Decrypt.decrypt(target, tag)
             except ValueError:
+                logging.warn('detected attack')
                 self.transport.close()
                 return None
+
+            addr_len = target[0]
+            addr = target[:addr_len]
+            port = struct.unpack('>H', target[-2:])[0]
+
+            self.connecting = asyncio.ensure_future(self.connect(addr, port))
+
+            self.data_buf = self.data_buf[5 + continue_read + payload_len:]
+            self.data_len = len(self.data_buf)
+            self.state = self.CONNECTING
+
+        elif self.state == self.CONNECTING:
+            self.data_buf += data
+            self.data_len += len(data)
+            if self.connecting.done():
+                if utils.get_content(self.data_buf, self.data_len, True):
+                    content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                            self.data_len,
+                                                                            True)
+                    tag = content[-16:]
+                    content = content[:-16]
+                    content = self.Decrypt.decrypt(content, tag)
+                    self.remote_transport.write(content)
+                    self.state = self.RELAY
+                else:
+                    return None
+
+        elif self.state == self.RELAY:
+            self.data_buf += data
+            self.data_len += len(data)
+            if utils.get_content(self.data_buf, self.data_len, True):
+                content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                        self.data_len,
+                                                                        True)
+                tag = content[-16:]
+                content = content[:-16]
+                content = self.Decrypt.decrypt(content, tag)
+                self.remote_transport.write(content)
+
+    async def connect(self, addr, port):
+        logging.debug('connecting target')
+        loop = asyncio.get_event_loop()
+        transport, remote = await loop.create_connection(Remote, addr, port)
+        remote.server_transport = self.transport
+        remote.Encrypt = self.Encrypt
+        remote.Decrypt = self.Decrypt
+        self.remote_transport = transport
+        if self.data_buf:
+            if utils.get_content(self.data_buf, self.data_len, True):
+                content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                        self.data_len,
+                                                                        True)
+                tag = connect[-16:]
+                connect = [:-16]
+                try:
+                    content = self.Decrypt.decrypt(connect, tag)
+                except ValueError:
+                    self.transport.close()
+                    return None
+
+                self.remote_transport.write(connect)
+
+                self.data_buf = self.data_buf[5 + continue_read + payload_len:]
+                self.data_len = len(self.data_buf)
+                self.state = self.RELAY
 
 
 if __name__ == '__main__':

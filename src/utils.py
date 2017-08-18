@@ -181,4 +181,4 @@ def get_content(data_buf, data_len, mask):
     else:
         content = data_buf[5 + continue_read:5 + continue_read + payload_len]
 
-    return content
+    return content, continue_read, payload_len

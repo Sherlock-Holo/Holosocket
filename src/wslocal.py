@@ -63,7 +63,28 @@ class Remote(asyncio.Protocol):
                 self.server_transport.write(socks_reponse)
 
         elif self.state == self.RELAY:
+            self.data_buf += data
+            self.data_len += len(data)
+            if utils.get_content(self.data_buf, self.data_len, False):
+                content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                        self.data_len,
+                                                                        True)
+            else:
+                return None
 
+            tag = content[-16:]
+            content = content[:-16]
+            try:
+                content = self.Decrypt.decrypt(content, tag)
+            except ValueError:
+                logging.warn('detected attack')
+                self.transport.close()
+                return None
+
+            self.server_transport.write(content)
+
+            self.data_buf = self.data_buf[1 + continue_read + payload_len]
+            self.data_len = len(self.data_buf)
 
 
 class Server(asyncio.Protocol):
@@ -165,7 +186,9 @@ class Server(asyncio.Protocol):
             logging.info('start relay')
 
         elif self.state == self.RELAY:
-            pass
+            content, tag = self.Encrypt.encrypt(data)
+            content = utils.gen_local_frame(content + tag)
+            self.remote_transport.write(content)
 
     async def connect(self, addr, port, target):
         loop = asyncio.get_event_loop()
