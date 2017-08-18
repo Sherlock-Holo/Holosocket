@@ -42,7 +42,7 @@ def gen_request(addr, port):
     Sec_WebSocket_Key = secrets.token_urlsafe(16)
     Sec_WebSocket_Key = base64.b64encode(Sec_WebSocket_Key.encode())
     data = b'GET /chat HTTP/1.1\r\n'
-    data += b'Host: ' + addr.encode() + str(port).encode() + b'\r\n'
+    data += b'Host: ' + addr.encode() + b':' + str(port).encode() + b'\r\n'
     data += b'Upgrade: websocket\r\n'
     data += b'Connection: Upgrade\r\n'
     data += b'Sec-WebSocket-Key: ' + Sec_WebSocket_Key + b'\r\n'
@@ -50,13 +50,13 @@ def gen_request(addr, port):
     return data, Sec_WebSocket_Key
 
 
-def certificate_key(Sec_WebSocket_Key1, Sec_WebSocket_Key2):
+def certificate_key(Sec_WebSocket_Key, Sec_WebSocket_Accept):
     guid = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
-    Sec_WebSocket_Key1 += guid
+    Sec_WebSocket_Key += guid
     sha1 = hashlib.sha1()
-    sha1.update(Sec_WebSocket_Key1)
-    Sec_WebSocket_Key1 = base64.b64encode(sha1.digest())
-    if Sec_WebSocket_Key2 == Sec_WebSocket_Key1:
+    sha1.update(Sec_WebSocket_Key)
+    Sec_WebSocket_Key = base64.b64encode(sha1.digest())
+    if Sec_WebSocket_Accept == Sec_WebSocket_Key:
         return True
     else:
         return False
@@ -125,7 +125,7 @@ def gen_close_frame(mask):
 
 
 def certificate(header, addr, port):
-    if header['Host'] != b':'.join([addr.encode(), port.encode()]):
+    if header['Host'] != b':'.join([addr.encode(), str(port).encode()]):
         return False
     elif header['Upgrade'] != b'websocket':
         return False
@@ -161,25 +161,32 @@ def get_content(data_buf, data_len, mask_flag):
             if data_len < 4:
                 return False
             else:
-                payload_len = struct.unpack('>H', data_buf[2:4])
+                payload_len = struct.unpack('>H', data_buf[2:4])[0]
                 continue_read = 2
 
         elif payload_len1 == 127:
             if data_len < 10:
                 return False
             else:
-                payload_len = struct.unpack('>Q', data_buf[2:10])
+                payload_len = struct.unpack('>Q', data_buf[2:10])[0]
                 continue_read = 8
 
-    if data_len < 2 + continue_read + 4:
-        return False
-    else:
-        mask_key = data_buf[2 + continue_read:6 + continue_read]
+    if mask_flag:
+        if data_len < 2 + continue_read + 4:
+            return False
+        else:
+            mask_key = data_buf[2 + continue_read:6 + continue_read]
 
-    if data_len < 2 + continue_read + 4 + payload_len:
-        return False
+        if data_len < 2 + continue_read + 4 + payload_len:
+            return False
+        else:
+            content = data_buf[6 + continue_read:6 + continue_read + payload_len]
+            content = mask(content, mask_key)[0]
+
     else:
-        content = data_buf[5 + continue_read:5 + continue_read + payload_len]
-        content = mask(content, mask_key)[0]
+        if data_len < 2 + continue_read + payload_len:
+            return False
+        else:
+            content = data_buf[2 + continue_read:2 + continue_read + payload_len]
 
     return content, continue_read, payload_len
