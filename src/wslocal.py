@@ -42,19 +42,27 @@ class Remote(asyncio.Protocol):
             if self.data_buf.endswith(b'\r\n\r\n'):
                 request = self.data_buf[:-4]
                 request = request.split(b'\r\n')
+                logging.debug('header: {}'.format(request))
                 header = {}
                 for i in request:
-                    header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
+                    try:
+                        header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
+                    except IndexError:
+                        pass
 
             else:
                 return None
 
+            logging.debug('header: {}'.format(header))
+
             if not utils.certificate_key(self.Sec_WebSocket_Key,
-                                         header['Sec_WebSocket_Key']):
+                                         header['Sec-WebSocket-Accept']):
                 self.transport.close()
             else:
+                logging.debug('handshake done')
                 self.state = self.RELAY
                 self.transport.write(utils.gen_local_frame(self.salt))
+                logging.debug('sent salt: {}'.format(self.salt))
                 target, tag = self.Encrypt.encrypt(self.target)
                 self.transport.write(utils.gen_local_frame(target + tag))
                 socks_reponse = b'\x05\x00\x00\x01'

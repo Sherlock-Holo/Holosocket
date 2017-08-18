@@ -54,7 +54,11 @@ class Server(asyncio.Protocol):
                 request = request.split(b'\r\n')
                 header = {}
                 for i in request:
-                    header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
+                    try:
+                        header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
+                    except IndexError:
+                        pass
+                logging.debug(header)
 
             else:
                 return None
@@ -82,11 +86,12 @@ class Server(asyncio.Protocol):
                                                                      True)
             else:
                 return None
+            logging.debug('salt: {}'.format(salt))
 
-                self.Encrypt = aes_gcm(KEY, salt)
-                self.Decrypt = aes_gcm(KEY, salt)
+            self.Encrypt = aes_gcm(KEY, salt)
+            self.Decrypt = aes_gcm(KEY, salt)
 
-            self.data_buf = self.data_buf[5 + continue_read + payload_len:]
+            self.data_buf = self.data_buf[6 + continue_read + payload_len:]
             self.data_len = len(self.data_buf)
             self.state = self.TARGET
 
@@ -115,7 +120,7 @@ class Server(asyncio.Protocol):
 
             self.connecting = asyncio.ensure_future(self.connect(addr, port))
 
-            self.data_buf = self.data_buf[5 + continue_read + payload_len:]
+            self.data_buf = self.data_buf[6 + continue_read + payload_len:]
             self.data_len = len(self.data_buf)
             self.state = self.CONNECTING
 
@@ -170,7 +175,7 @@ class Server(asyncio.Protocol):
 
                 self.remote_transport.write(content)
 
-                self.data_buf = self.data_buf[5 + continue_read + payload_len:]
+                self.data_buf = self.data_buf[6 + continue_read + payload_len:]
                 self.data_len = len(self.data_buf)
                 self.state = self.RELAY
 
@@ -191,7 +196,7 @@ if __name__ == '__main__':
     AUTH = config['auth_addr']
 
     loop = asyncio.get_event_loop()
-    _server = loop.create_server(Server, '127.0.0.2', PORT)
+    _server = loop.create_server(Server, '127.0.0.2', SERVER_PORT)
     server = loop.run_until_complete(_server)
 
     try:
