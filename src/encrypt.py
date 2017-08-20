@@ -69,7 +69,7 @@ class aes_gcm:
     def encrypt(self, data):
         self._new()
         '''Return (cpiher, MAC)'''
-        return self.cipher.encrypt(data), self.cipher.digest()
+        return self.cipher.encrypt_and_digest(data)
 
     def decrypt(self, data, mac):
         self._new()
@@ -93,5 +93,5 @@ if __name__ == '__main__':
     salt = gen.salt
     nonce = gen.nonce
     gcipher = gen.encrypt(b'holo')
-    gde = aes_gcm('test', salt, nonce)
+    gde = aes_gcm('test', salt)
     print(gde.decrypt(*gcipher))
