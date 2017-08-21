@@ -60,7 +60,6 @@ class Remote(asyncio.Protocol):
                 self.transport.close()
             else:
                 logging.debug('handshake done')
-                self.state = self.RELAY
                 self.transport.write(utils.gen_local_frame(self.salt))
                 logging.debug('sent salt: {}'.format(self.salt))
                 target, tag = self.Encrypt.encrypt(self.target)
@@ -69,6 +68,7 @@ class Remote(asyncio.Protocol):
                 socks_reponse += socket.inet_aton('0.0.0.0')
                 socks_reponse += struct.pack('>H', 0)
                 self.server_transport.write(socks_reponse)
+                self.state = self.RELAY
 
         elif self.state == self.RELAY:
             self.data_buf += data
@@ -76,7 +76,7 @@ class Remote(asyncio.Protocol):
             if utils.get_content(self.data_buf, self.data_len, False):
                 content, continue_read, payload_len = utils.get_content(self.data_buf,
                                                                         self.data_len,
-                                                                        True)
+                                                                        False)
             else:
                 return None
 

@@ -115,8 +115,9 @@ class Server(asyncio.Protocol):
                 return None
 
             addr_len = target[0]
-            addr = target[:addr_len]
+            addr = target[1:1 + addr_len]
             port = struct.unpack('>H', target[-2:])[0]
+            logging.debug('target: {}:{}'.format(addr, port))
 
             self.connecting = asyncio.ensure_future(self.connect(addr, port))
 
@@ -141,6 +142,7 @@ class Server(asyncio.Protocol):
                     return None
 
         elif self.state == self.RELAY:
+            logging.debug('start relay')
             self.data_buf += data
             self.data_len += len(data)
             if utils.get_content(self.data_buf, self.data_len, True):
@@ -156,6 +158,7 @@ class Server(asyncio.Protocol):
         logging.debug('connecting target')
         loop = asyncio.get_event_loop()
         transport, remote = await loop.create_connection(Remote, addr, port)
+        logging.debug('connected target')
         remote.server_transport = self.transport
         remote.Encrypt = self.Encrypt
         remote.Decrypt = self.Decrypt
