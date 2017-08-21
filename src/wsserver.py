@@ -28,6 +28,7 @@ class Remote(asyncio.Protocol):
     def data_received(self, data):
         content, tag = self.Encrypt.encrypt(data)
         content = utils.gen_server_frame(content + tag)
+        #logging.debug('content: {}'.format(content))
         self.server_transport.write(content)
 
 
@@ -119,10 +120,10 @@ class Server(asyncio.Protocol):
             port = struct.unpack('>H', target[-2:])[0]
             logging.debug('target: {}:{}'.format(addr, port))
 
-            self.connecting = asyncio.ensure_future(self.connect(addr, port))
-
             self.data_buf = self.data_buf[6 + continue_read + payload_len:]
             self.data_len = len(self.data_buf)
+
+            self.connecting = asyncio.ensure_future(self.connect(addr, port))
             self.state = self.CONNECTING
 
         elif self.state == self.CONNECTING:
@@ -151,7 +152,13 @@ class Server(asyncio.Protocol):
                                                                         True)
                 tag = content[-16:]
                 content = content[:-16]
-                content = self.Decrypt.decrypt(content, tag)
+                try:
+                    content = self.Decrypt.decrypt(content, tag)
+                except ValueError:
+                    logging.debug('detected relay data attack')
+                    self.transport.close()
+                    return None
+
                 self.remote_transport.write(content)
 
     async def connect(self, addr, port):
@@ -163,24 +170,24 @@ class Server(asyncio.Protocol):
         remote.Encrypt = self.Encrypt
         remote.Decrypt = self.Decrypt
         self.remote_transport = transport
-        if self.data_buf:
-            if utils.get_content(self.data_buf, self.data_len, True):
-                content, continue_read, payload_len = utils.get_content(self.data_buf,
-                                                                        self.data_len,
-                                                                        True)
-                tag = content[-16:]
-                content = content[:-16]
-                try:
-                    content = self.Decrypt.decrypt(content, tag)
-                except ValueError:
-                    self.transport.close()
-                    return None
+        if utils.get_content(self.data_buf, self.data_len, True):
+            content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                    self.data_len,
+                                                                    True)
+            tag = content[-16:]
+            content = content[:-16]
+            try:
+                content = self.Decrypt.decrypt(content, tag)
+            except ValueError:
+                self.transport.close()
+                return None
 
-                self.remote_transport.write(content)
+            self.remote_transport.write(content)
+            logging.debug('send directly')
 
-                self.data_buf = self.data_buf[6 + continue_read + payload_len:]
-                self.data_len = len(self.data_buf)
-                self.state = self.RELAY
+            self.data_buf = self.data_buf[6 + continue_read + payload_len:]
+            self.data_len = len(self.data_buf)
+            self.state = self.RELAY
 
 
 if __name__ == '__main__':

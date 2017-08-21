@@ -42,7 +42,7 @@ class Remote(asyncio.Protocol):
             if self.data_buf.endswith(b'\r\n\r\n'):
                 request = self.data_buf[:-4]
                 request = request.split(b'\r\n')
-                logging.debug('header: {}'.format(request))
+                #logging.debug('header: {}'.format(request))
                 header = {}
                 for i in request:
                     try:
@@ -69,17 +69,22 @@ class Remote(asyncio.Protocol):
                 socks_reponse += struct.pack('>H', 0)
                 self.server_transport.write(socks_reponse)
                 self.state = self.RELAY
+                self.data_buf = b''
+                self.data_len = 0
+                logging.debug('start relay')
 
         elif self.state == self.RELAY:
             self.data_buf += data
             self.data_len += len(data)
             if utils.get_content(self.data_buf, self.data_len, False):
+                #logging.debug('raw data: {}'.format(self.data_buf))
                 content, continue_read, payload_len = utils.get_content(self.data_buf,
                                                                         self.data_len,
                                                                         False)
             else:
                 return None
 
+            #logging.debug('content: {}'.format(content))
             tag = content[-16:]
             content = content[:-16]
             try:
@@ -91,7 +96,7 @@ class Remote(asyncio.Protocol):
 
             self.server_transport.write(content)
 
-            self.data_buf = self.data_buf[1 + continue_read + payload_len]
+            self.data_buf = self.data_buf[2 + continue_read + payload_len:]
             self.data_len = len(self.data_buf)
 
 
@@ -191,7 +196,6 @@ class Server(asyncio.Protocol):
             # clear buffer and counter, actually it is not important here
             self.data_len = 0
             self.data_buf = b''
-            logging.info('start relay')
 
         elif self.state == self.RELAY:
             content, tag = self.Encrypt.encrypt(data)
@@ -203,9 +207,9 @@ class Server(asyncio.Protocol):
         transport, remote = await loop.create_connection(Remote, addr, port)
         remote.target = target
         remote.server_transport = self.transport
+        remote.salt = self.salt
         remote.Encrypt = self.Encrypt
         remote.Decrypt = self.Decrypt
-        remote.salt = self.salt
         self.remote_transport = transport
         handshake, remote.Sec_WebSocket_Key = utils.gen_request(AUTH,
                                                                 SERVER_PORT)
