@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import logging
 import secrets
 import struct
 
@@ -148,10 +149,7 @@ def get_content(data_buf, data_len, mask_flag):
     if data_len < 2:
         return False
     else:
-        if mask_flag:
-            payload_len1 = data_buf[1] & 0x7f
-        else:
-            payload_len1 = data_buf[1]
+        payload_len1 = data_buf[1] & 0x7f
 
         if payload_len1 <= 125:
             payload_len = payload_len1
@@ -188,5 +186,8 @@ def get_content(data_buf, data_len, mask_flag):
             return False
         else:
             content = data_buf[2 + continue_read:2 + continue_read + payload_len]
+
+    logging.debug('payload_len1: {}'.format(payload_len1))
+    logging.debug('continue_read: {}'.format(continue_read))
 
     return content, continue_read, payload_len
