@@ -42,13 +42,22 @@ def gen_data_len(mask_flag, data):
 def gen_request(addr, port):
     Sec_WebSocket_Key = secrets.token_urlsafe(16)
     Sec_WebSocket_Key = base64.b64encode(Sec_WebSocket_Key.encode())
-    data = b'GET /chat HTTP/1.1\r\n'
-    data += b'Host: ' + addr.encode() + b':' + str(port).encode() + b'\r\n'
-    data += b'Upgrade: websocket\r\n'
-    data += b'Connection: Upgrade\r\n'
-    data += b'Sec-WebSocket-Key: ' + Sec_WebSocket_Key + b'\r\n'
-    data += b'Sec-WebSocket-Version: 13\r\n\r\n'
-    return data, Sec_WebSocket_Key
+    data = [
+        b'GET /chat HTTP/1.1\r\n',
+        b'Host: ',
+        addr.encode(),
+        b':',
+        str(port).encode(),
+        b'\r\n',
+        b'Upgrade: websocket\r\n',
+        b'Connection: Upgrade\r\n',
+        b'Sec-WebSocket-Key: ',
+        Sec_WebSocket_Key,
+        b'\r\n',
+        b'Sec-WebSocket-Version: 13\r\n\r\n'
+    ]
+
+    return b''.join(data), Sec_WebSocket_Key
 
 
 def certificate_key(Sec_WebSocket_Key, Sec_WebSocket_Accept):
@@ -68,12 +77,17 @@ def gen_response(Sec_WebSocket_Key):
     Sec_WebSocket_Key += guid
     sha1 = hashlib.sha1()
     sha1.update(Sec_WebSocket_Key)
-    Sec_WebSocket_Key = base64.b64encode(sha1.digest())
-    data = b'HTTP/1.1 101 Switching Protocols\r\n'
-    data += b'Upgrade: websocket\r\n'
-    data += b'Connection: Upgrade\r\n'
-    data += b'Sec-WebSocket-Accept: ' + Sec_WebSocket_Key + b'\r\n\r\n'
-    return data
+    Sec_WebSocket_Accept = base64.b64encode(sha1.digest())
+    data = [
+        b'HTTP/1.1 101 Switching Protocols\r\n',
+        b'Upgrade: websocket\r\n',
+        b'Connection: Upgrade\r\n',
+        b'Sec-WebSocket-Accept: ',
+        Sec_WebSocket_Accept,
+        b'\r\n\r\n'
+    ]
+
+    return b''.join(data)
 
 
 def mask(data, mask_key=None):
