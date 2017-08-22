@@ -138,6 +138,9 @@ class Server(asyncio.Protocol):
                     content = content[:-16]
                     content = self.Decrypt.decrypt(content, tag)
                     self.remote_transport.write(content)
+                    self.data_buf = self.data_buf[6 + continue_read + payload_len:]
+                    self.data_len = len(self.data_buf)
+                    logging.debug('send in relay')
                     self.state = self.RELAY
                 else:
                     return None
@@ -160,6 +163,9 @@ class Server(asyncio.Protocol):
                     return None
 
                 self.remote_transport.write(content)
+
+                self.data_buf = self.data_buf[6 + continue_read + payload_len:]
+                self.data_len = len(self.data_buf)
 
     async def connect(self, addr, port):
         logging.debug('connecting target')
