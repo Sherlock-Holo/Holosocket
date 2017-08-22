@@ -187,7 +187,7 @@ def get_content(data_buf, data_len, mask_flag):
         else:
             content = data_buf[2 + continue_read:2 + continue_read + payload_len]
 
-    logging.debug('payload_len1: {}'.format(payload_len1))
-    logging.debug('continue_read: {}'.format(continue_read))
+    #logging.debug('payload_len1: {}'.format(payload_len1))
+    #logging.debug('continue_read: {}'.format(continue_read))
 
     return content, continue_read, payload_len
