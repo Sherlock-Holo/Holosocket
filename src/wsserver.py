@@ -35,10 +35,6 @@ class Remote(asyncio.Protocol):
 class Server(asyncio.Protocol):
     HANDSHAKE, SALT, TARGET, CONNECTING, RELAY = range(5)
 
-    def clean_buffer(self):
-        self.data_len = 0
-        self.data_buf = b''
-
     def connection_made(self, transport):
         client_info = transport.get_extra_info('peername')
         logging.debug('connect from {}'.format(client_info))
@@ -75,7 +71,8 @@ class Server(asyncio.Protocol):
             response = utils.gen_response(header['Sec-WebSocket-Key'])
             self.transport.write(response)
             self.state = self.SALT
-            self.clean_buffer()
+            self.data_len = 0
+            self.data_buf = b''
 
         elif self.state == self.SALT:
             self.data_buf += data
@@ -87,14 +84,41 @@ class Server(asyncio.Protocol):
                                                                      True)
             else:
                 return None
-            logging.debug('salt: {}'.format(salt))
+            #logging.debug('salt: {}'.format(salt))
 
             self.Encrypt = aes_gcm(KEY, salt)
             self.Decrypt = aes_gcm(KEY, salt)
 
             self.data_buf = self.data_buf[6 + continue_read + payload_len:]
             self.data_len = len(self.data_buf)
-            self.state = self.TARGET
+            if utils.get_content(self.data_buf, self.data_len, True):
+                content, continue_read, payload_len = utils.get_content(self.data_buf,
+                                                                        self.data_len,
+                                                                        True)
+
+                target = content[:-16]
+                tag = content[-16:]
+                try:
+                    target = self.Decrypt.decrypt(target, tag)
+                except ValueError:
+                    logging.warn('detected attack')
+                    self.transport.close()
+                    return None
+
+                addr_len = target[0]
+                addr = target[1:1 + addr_len]
+                port = struct.unpack('>H', target[-2:])[0]
+                logging.debug('target: {}:{}'.format(addr, port))
+
+                self.data_buf = self.data_buf[6 + continue_read + payload_len:]
+                self.data_len = len(self.data_buf)
+
+                self.connecting = asyncio.ensure_future(self.connect(addr, port))
+                self.state = self.CONNECTING
+
+            else:
+                self.state = self.TARGET
+                return None
 
         elif self.state == self.TARGET:
             self.data_buf += data
@@ -138,15 +162,16 @@ class Server(asyncio.Protocol):
                     content = content[:-16]
                     content = self.Decrypt.decrypt(content, tag)
                     self.remote_transport.write(content)
+
                     self.data_buf = self.data_buf[6 + continue_read + payload_len:]
                     self.data_len = len(self.data_buf)
-                    logging.debug('send in relay')
+
                     self.state = self.RELAY
+                    logging.debug('start relay')
                 else:
                     return None
 
         elif self.state == self.RELAY:
-            logging.debug('start relay')
             self.data_buf += data
             self.data_len += len(data)
             if utils.get_content(self.data_buf, self.data_len, True):
