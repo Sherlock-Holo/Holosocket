@@ -25,7 +25,7 @@ async def handle(reader, writer):
         return None
     else:
         nmethods = request[1]
-        logging.debug('methods number: {}'.format(nmethods))
+        #logging.debug('methods number: {}'.format(nmethods))
         methods = await reader.read(nmethods)
         if 0 in methods:
             writer.write(b'\x05\x00')
@@ -130,7 +130,7 @@ async def handle(reader, writer):
 
     # send salt
     r_writer.write(utils.gen_local_frame(salt))
-    logging.debug('salt: {}'.format(salt))
+    #logging.debug('salt: {}'.format(salt))
     await r_writer.drain()
 
     data_to_send, tag = Encrypt.encrypt(data_to_send)
@@ -141,7 +141,7 @@ async def handle(reader, writer):
     # resolve websocket frame
     async def get_content():
         FRO = await r_reader.read(1)  # (FIN, RSV * 3, optcode)
-        if len(FRO) <= 0:
+        if not FRO:
             return FRO
 
         prefix = await r_reader.read(1)
@@ -163,7 +163,8 @@ async def handle(reader, writer):
     async def sock2remote():
         while True:
             data = await reader.read(4096)
-            if len(data) <= 0:
+            if not data:
+                logging.debug('stop relay')
                 break
             data, tag = Encrypt.encrypt(data)
             content = utils.gen_local_frame(data + tag)
@@ -173,7 +174,8 @@ async def handle(reader, writer):
     async def remote2sock():
         while True:
             data = await get_content()
-            if len(data) <= 0:
+            if not data:
+                logging.debug('stop relay')
                 break
             tag = data[-16:]
             content = data[:-16]
@@ -185,15 +187,17 @@ async def handle(reader, writer):
             await writer.drain()
 
     logging.debug('start relay')
-    try:
-        s2r = asyncio.ensure_future(sock2remote())
-        r2s = asyncio.ensure_future(remote2sock())
 
-    except:
-        s2r.cancel()
-        r2s.cancel()
-        writer.close()
-        r_writer.close()
+    # def close_transport(sock):
+    # sock.close()
+    #    logging.debug('relay stop')
+
+    s2r = asyncio.ensure_future(sock2remote(), loop=relay_loop)
+    r2s = asyncio.ensure_future(remote2sock(), loop=relay_loop)
+
+    # expreriment
+    # s2r.add_done_callback(close_transport(writer))
+    # r2s.add_done_callback(close_transport(r_writer))
 
 
 if __name__ == '__main__':
@@ -212,6 +216,7 @@ if __name__ == '__main__':
     AUTH = config['auth_addr']
 
     loop = asyncio.get_event_loop()
+    relay_loop = asyncio.get_event_loop()
     coro = asyncio.start_server(handle, '127.0.0.2', PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
