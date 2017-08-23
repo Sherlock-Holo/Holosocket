@@ -64,7 +64,7 @@ async def handle(reader, writer):
     logging.debug('remote: {}:{}'.format(addr, port))
     data_to_send = []
     addr_len = len(addr)
-    data_to_send.append(addr_len)
+    data_to_send.append(struct.pack('>B', addr_len))
     if atyp == 1:
         data_to_send.append(socket.inet_aton(addr))
     elif atyp == 3:
@@ -80,6 +80,7 @@ async def handle(reader, writer):
     data.append(socket.inet_aton('0.0.0.0'))
     data.append(struct.pack('>H', 0))
     writer.write(b''.join(data))
+    await writer.drain()
 
     r_reader, r_writer = await asyncio.open_connection(SERVER, SERVER_PORT)
     handshake, Sec_WebSocket_Key = utils.gen_request(AUTH, SERVER_PORT)
@@ -91,7 +92,7 @@ async def handle(reader, writer):
     response = response[:-4]
     response = response.split(b'\r\n')
     header = {}
-    for i in request:
+    for i in response:
         try:
             header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
         except IndexError:
@@ -104,9 +105,12 @@ async def handle(reader, writer):
         r_writer.close()
         return None
     logging.debug('handshake done')
+
     Encrypt = aes_gcm(KEY)
     salt = Encrypt.salt
     Decrypt = aes_gcm(KEY, salt)
+
+    # send salt
     r_writer.write(utils.gen_local_frame(salt))
     logging.debug('salt: {}'.format(salt))
     await r_writer.drain()
@@ -116,55 +120,49 @@ async def handle(reader, writer):
     await r_writer.drain()
 
     async def get_content():
-        FRO = await reader.read(1)  # (FIN, RSV * 3, optcode)
+        FRO = await r_reader.read(1)  # (FIN, RSV * 3, optcode)
         if len(FRO) <= 0:
             return FRO
 
-        prefix = await reader.read(1)
-        prefix = prefix & 0x7f
+        prefix = await r_reader.read(1)
+        prefix = struct.unpack('>B', prefix)[0]
         if prefix <= 125:
             payload_len = prefix
 
         elif prefix == 126:
-            _payload_len = await reader.read(2)
+            _payload_len = await r_reader.read(2)
             payload_len = struct.unpack('>H', _payload_len)[0]
 
         elif prefix == 127:
-            _payload_len = await reader.read(8)
+            _payload_len = await r_reader.read(8)
             payload_len = struct.unpack('>Q', _payload_len)[0]
 
-        content = await reader.read(payload_len)
+        content = await r_reader.read(payload_len)
         return content
 
     async def sock2remote():
         while True:
-            try:
-                data = await reader.read(4096)
-                if len(data) <= 0:
-                    break
-                data, tag = Encrypt.encrypt(data)
-                content = utils.gen_local_frame(data + tag)
-                r_writer.write(content)
-                await r_writer.drain()
-            except:
+            data = await reader.read(4096)
+            if len(data) <= 0:
                 break
+            data, tag = Encrypt.encrypt(data)
+            content = utils.gen_local_frame(data + tag)
+            r_writer.write(content)
+            await r_writer.drain()
 
     async def remote2sock():
         while True:
-            try:
-                data = get_content()
-                if len(data) <= 0:
-                    break
-                tag = data[-16:]
-                content = data[:-16]
-                try:
-                    data = Decrypt.decrypt(content, tag)
-                except ValueError:
-                    break
-                writer.write(data)
-                await writer.drain()
-            except:
+            data = await get_content()
+            if len(data) <= 0:
                 break
+            tag = data[-16:]
+            content = data[:-16]
+            try:
+                data = Decrypt.decrypt(content, tag)
+            except ValueError:
+                break
+            writer.write(data)
+            await writer.drain()
 
     logging.debug('start relay')
     try:

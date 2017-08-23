@@ -158,7 +158,7 @@ def not_found():
     data += b'Connection: Closed\r\n\r\n'
     return data
 
-
+# deprecated
 def get_content(data_buf, data_len, mask_flag):
     if data_len < 2:
         return False

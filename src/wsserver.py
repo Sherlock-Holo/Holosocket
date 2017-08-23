@@ -47,7 +47,7 @@ async def handle(reader, writer):
             return FRO
 
         prefix = await reader.read(1)
-        prefix = prefix & 0x7f
+        prefix = struct.unpack('>B', prefix)[0] & 0x7f
         if prefix <= 125:
             payload_len = prefix
 
@@ -61,14 +61,14 @@ async def handle(reader, writer):
 
         mask_key = await reader.read(4)
         payload = await reader.read(payload_len)
-        content = utils.mask(payload, mask_key)
+        content = utils.mask(payload, mask_key)[0]
         return content
 
-    salt = get_content()
+    salt = await get_content()
+    logging.debug('salt: {}'.format(salt))
     Encrypt = aes_gcm(KEY, salt)
     Decrypt = aes_gcm(KEY, salt)
-    logging.debug('salt: {}'.format(salt))
-    data_to_send = get_content()
+    data_to_send = await get_content()
     tag = data_to_send[-16:]
     data = data_to_send[:-16]
     content = Decrypt.decrypt(data, tag)
@@ -81,33 +81,27 @@ async def handle(reader, writer):
 
     async def sock2remote():
         while True:
-            try:
-                data = get_content()
-                if len(data) <= 0:
-                    break
-                tag = data[-16:]
-                content = data[:-16]
-                try:
-                    data = Decrypt.decrypt(content, tag)
-                except ValueError:
-                    break
-                r_writer.write(data)
-                await r_writer.drain()
-            except:
+            data = await get_content()
+            if len(data) <= 0:
                 break
+            tag = data[-16:]
+            content = data[:-16]
+            try:
+                data = Decrypt.decrypt(content, tag)
+            except ValueError:
+                break
+            r_writer.write(data)
+            await r_writer.drain()
 
     async def remote2sock():
         while True:
-            try:
-                data = await r_reader.read(4096)
-                if len(data) <= 0:
-                    break
-                data, tag = Encrypt.encrypt(data)
-                content = utils.gen_server_frame(data + tag)
-                writer.write(content)
-                await writer.drain()
-            except:
+            data = await r_reader.read(4096)
+            if len(data) <= 0:
                 break
+            data, tag = Encrypt.encrypt(data)
+            content = utils.gen_server_frame(data + tag)
+            writer.write(content)
+            await writer.drain()
 
     logging.debug('start relay')
     try:
@@ -134,7 +128,7 @@ if __name__ == '__main__':
     AUTH = config['auth_addr']
 
     loop = asyncio.get_event_loop()
-    coro = asyncio.start_server(handle, '127.0.0.2', 1089, loop=loop)
+    coro = asyncio.start_server(handle, SERVER, SERVER_PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
     try:
