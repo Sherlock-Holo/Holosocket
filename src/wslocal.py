@@ -189,7 +189,7 @@ if __name__ == '__main__':
     AUTH = config['auth_addr']
 
     loop = asyncio.get_event_loop()
-    coro = asyncio.start_server(handle, '127.0.0.2', 1089, loop=loop)
+    coro = asyncio.start_server(handle, '127.0.0.2', PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
     try:
