@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import functools
 import json
 import logging
 import struct
@@ -93,6 +94,7 @@ async def handle(reader, writer):
         while True:
             data = await get_content()
             if not data:
+                logging.debug('relay stop')
                 break
             tag = data[-16:]
             content = data[:-16]
@@ -107,6 +109,7 @@ async def handle(reader, writer):
         while True:
             data = await r_reader.read(4096)
             if not data:
+                logging.debug('relay stop')
                 break
             data, tag = Encrypt.encrypt(data)
             content = utils.gen_server_frame(data + tag)
@@ -115,16 +118,15 @@ async def handle(reader, writer):
 
     logging.debug('start relay')
 
-    def close_transport(sock):
-        #sock.close()
-        logging.debug('relay stop')
+    def close_transport(sock, *args):
+        sock.close()
 
     s2r = asyncio.ensure_future(sock2remote(), loop=relay_loop)
     r2s = asyncio.ensure_future(remote2sock(), loop=relay_loop)
 
     # expreriment
-    #s2r.add_done_callback(close_transport(writer))
-    #r2s.add_done_callback(close_transport(r_writer))
+    s2r.add_done_callback(functools.partial(close_transport, writer))
+    r2s.add_done_callback(functools.partial(close_transport, r_writer))
 
 
 if __name__ == '__main__':
