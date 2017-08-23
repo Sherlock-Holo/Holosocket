@@ -15,24 +15,29 @@ logging.basicConfig(level=logging.DEBUG,
 
 
 async def handle(reader, writer):
+    # get local handshake message
     request = []
     for i in range(7):
         request.append(await reader.readline())
     request = b''.join(request)
     request = request[:-4]
     request = request.split(b'\r\n')
+
     if request[0] != b'GET /chat HTTP/1.1':
         writer.write(utils.not_found())
         writer.close()
         return None
+
     header = {}
     for i in request:
         try:
             header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
         except IndexError:
+            # ignore HTTP/1.1 101 Switching Protocols
             pass
     logging.debug('header: {}'.format(header))
 
+    # flitrate http request or attack request
     if not utils.certificate(header, AUTH, SERVER_PORT):
         writer.write(utils.not_found())
         writer.close()
@@ -64,10 +69,13 @@ async def handle(reader, writer):
         content = utils.mask(payload, mask_key)[0]
         return content
 
+    # get salt
     salt = await get_content()
     logging.debug('salt: {}'.format(salt))
     Encrypt = aes_gcm(KEY, salt)
     Decrypt = aes_gcm(KEY, salt)
+
+    # get target addr, port
     data_to_send = await get_content()
     tag = data_to_send[-16:]
     data = data_to_send[:-16]
@@ -77,6 +85,8 @@ async def handle(reader, writer):
     _port = content[-2:]
     port = struct.unpack('>H', _port)[0]
     logging.debug('target {}:{}'.format(addr, port))
+
+    # connect to target
     r_reader, r_writer = await asyncio.open_connection(addr, port)
 
     async def sock2remote():
@@ -110,10 +120,12 @@ async def handle(reader, writer):
     except:
         s2r.cancel()
         r2s.cancel()
+        writer.close()
+        r_writer.close()
 
 
 if __name__ == '__main__':
-    logging.info('start holosocket local')
+    #logging.info('start holosocket local')
     parser = argparse.ArgumentParser(description='holosocket local')
     parser.add_argument('-c', '--config', help='config file')
     args = parser.parse_args()
