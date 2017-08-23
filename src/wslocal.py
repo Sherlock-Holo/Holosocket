@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import argparse
 import asyncio
+import json
 import logging
 import socket
 import struct
@@ -44,71 +46,133 @@ async def handle(reader, writer):
         writer.close()
         logging.error('cmd not support')
         return None
-    else:
-        if atyp == 1:
-            _addr = await reader.read(4)
-            addr = socket.inet_ntoa(_addr)
 
-        elif atyp == 3:
-            addr_len = await reader.read(1)
-            addr = await reader.read(ord(addr_len))
+    if atyp == 1:
+        _addr = await reader.read(4)
+        addr = socket.inet_ntoa(_addr)
 
-        elif atyp == 4:
-            _addr = await reader.read(16)
-            addr = socket.inet_ntop(socket.AF_INET6, _addr)
+    elif atyp == 3:
+        addr_len = await reader.read(1)
+        addr = await reader.read(ord(addr_len))
 
-        _port = await reader.read(2)
-        port = struct.unpack('>H', _port)[0]
-        logging.debug('remote: {}:{}'.format(addr, port))
-        data_to_send = []
-        addr_len = len(addr)
-        data_to_send.append(addr_len)
-        if atyp == 1:
-            data_to_send.append(socket.inet_aton(addr))
-        elif atyp == 3:
-            data_to_send.append(addr)
-        elif atyp == 4:
-            data_to_send.append(socket.inet_pton(socket.AF_INET6, addr))
+    elif atyp == 4:
+        _addr = await reader.read(16)
+        addr = socket.inet_ntop(socket.AF_INET6, _addr)
 
-        data_to_send.append(_port)
-        data_to_send = b''.join(data_to_send)
+    _port = await reader.read(2)
+    port = struct.unpack('>H', _port)[0]
+    logging.debug('remote: {}:{}'.format(addr, port))
+    data_to_send = []
+    addr_len = len(addr)
+    data_to_send.append(addr_len)
+    if atyp == 1:
+        data_to_send.append(socket.inet_aton(addr))
+    elif atyp == 3:
+        data_to_send.append(addr)
+    elif atyp == 4:
+        data_to_send.append(socket.inet_pton(socket.AF_INET6, addr))
 
-        data = []
-        data.append(b'\x05\x00\x00\x01')
-        data.append(socket.inet_aton('0.0.0.0'))
-        data.append(struct.pack('>H', 0))
-        writer.write(b''.join(data))
+    data_to_send.append(_port)
+    data_to_send = b''.join(data_to_send)
 
-        r_reader, r_writer = await asyncio.open_connection(SERVER, SERVER_PORT)
-        handshake, Sec_WebSocket_Key = utils.gen_request(AUTH, SERVER_PORT)
-        r_writer.write(handshake)
-        response = []
-        for i in range(5):
-            response.append(r_reader.readline())
-        response = b''.join(response)
-        response = response[:-4]
-        response = response.split(b'\r\n')
-        header = {}
-        for i in request:
+    data = []
+    data.append(b'\x05\x00\x00\x01')
+    data.append(socket.inet_aton('0.0.0.0'))
+    data.append(struct.pack('>H', 0))
+    writer.write(b''.join(data))
+
+    r_reader, r_writer = await asyncio.open_connection(SERVER, SERVER_PORT)
+    handshake, Sec_WebSocket_Key = utils.gen_request(AUTH, SERVER_PORT)
+    r_writer.write(handshake)
+    response = []
+    for i in range(5):
+        response.append(await r_reader.readline())
+    response = b''.join(response)
+    response = response[:-4]
+    response = response.split(b'\r\n')
+    header = {}
+    for i in request:
+        try:
+            header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
+        except IndexError:
+            pass
+
+    if not utils.certificate_key(
+        Sec_WebSocket_Key,
+        header['Sec-WebSocket-Accept']
+    ):
+        r_writer.close()
+        return None
+    logging.debug('handshake done')
+    Encrypt = aes_gcm(KEY)
+    salt = Encrypt.salt
+    Decrypt = aes_gcm(KEY, salt)
+    r_writer.write(utils.gen_local_frame(salt))
+    logging.debug('salt: {}'.format(salt))
+    await r_writer.drain()
+    data_to_send, tag = Encrypt.encrypt(data_to_send)
+    content = utils.gen_local_frame(data_to_send + tag)
+    r_writer.write(content)
+    await r_writer.drain()
+
+    async def get_content():
+        FRO = await reader.read(1)  # (FIN, RSV * 3, optcode)
+        if len(FRO) <= 0:
+            return FRO
+
+        prefix = await reader.read(1)
+        prefix = prefix & 0x7f
+        if prefix <= 125:
+            payload_len = prefix
+
+        elif prefix == 126:
+            _payload_len = await reader.read(2)
+            payload_len = struct.unpack('>H', _payload_len)[0]
+
+        elif prefix == 127:
+            _payload_len = await reader.read(8)
+            payload_len = struct.unpack('>Q', _payload_len)[0]
+
+        content = await reader.read(payload_len)
+        return content
+
+    async def sock2remote():
+        while True:
             try:
-                header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
-            except IndexError:
-                pass
+                data = await reader.read(4096)
+                if len(data) <= 0:
+                    break
+                data, tag = Encrypt.encrypt(data)
+                content = utils.gen_local_frame(data + tag)
+                r_writer.write(content)
+                await r_writer.drain()
+            except:
+                break
 
-        if not utils.certificate_key(
-            Sec_WebSocket_Key,
-            header['Sec-WebSocket-Accept']
-        ):
-            r_writer.close()
-            return None
-        logging.debug('handshake done')
-        Encrypt = aes_gcm(KEY)
-        salt = Encrypt.salt
-        Decrypt = aes_gcm(KEY, salt)
-        r_writer.write(utils.gen_local_frame(salt))
-        await r_writer.drain()
+    async def remote2sock():
+        while True:
+            try:
+                data = get_content()
+                if len(data) <= 0:
+                    break
+                tag = data[-16:]
+                content = data[:-16]
+                try:
+                    data = Decrypt.decrypt(content, tag)
+                except ValueError:
+                    break
+                writer.write(data)
+                await writer.drain()
+            except:
+                break
 
-
+    logging.debug('start relay')
+    try:
+        s2r = asyncio.ensure_future(sock2remote())
+        r2s = asyncio.ensure_future(remote2sock())
+    except:
+        s2r.cancel()
+        r2s.cancel()
 
 
 if __name__ == '__main__':
