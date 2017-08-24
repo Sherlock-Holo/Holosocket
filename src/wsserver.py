@@ -114,13 +114,13 @@ async def handle(reader, writer):
                 try:
                     r_writer.write(close_frame)
                     await r_writer.drain()
+                    break
                 except ConnectionResetError as e:
                     logging.error(e)
                     break
                 except BrokenPipeError as e:
                     logging.error(e)
                     break
-                break
 
             # send data
             tag = data[-16:]
@@ -128,6 +128,7 @@ async def handle(reader, writer):
             try:
                 data = Decrypt.decrypt(content, tag)
             except ValueError:
+                logging.warn('detect attack')
                 break
 
             try:
@@ -159,13 +160,13 @@ async def handle(reader, writer):
                 try:
                     writer.write(close_frame)
                     await writer.drain()
+                    break
                 except ConnectionResetError as e:
                     logging.error(e)
                     break
                 except BrokenPipeError as e:
                     logging.error(e)
                     break
-                break
 
             # send data
             data, tag = Encrypt.encrypt(data)
