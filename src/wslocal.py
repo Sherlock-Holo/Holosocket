@@ -147,8 +147,10 @@ async def handle(reader, writer):
     # resolve websocket frame
     async def get_content():
         FRO = await r_reader.read(1)  # (FIN, RSV * 3, optcode)
-        FRO = struct.unpack('>B', FRO)[0]
-        if FRO == 1 << 7 | 8:
+        if not FRO:
+            return None
+
+        elif FRO == struct.pack('>B', 1 << 7 | 8):
             logging.debug('receive close frame')
             return None
 
