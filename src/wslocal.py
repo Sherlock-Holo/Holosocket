@@ -94,7 +94,11 @@ async def handle(reader, writer):
     await writer.drain()
 
     # connect to server
-    r_reader, r_writer = await asyncio.open_connection(SERVER, SERVER_PORT)
+    try:
+        r_reader, r_writer = await asyncio.open_connection(SERVER, SERVER_PORT)
+    except OSError as e:
+        logging.error(e)
+        return None
 
     handshake, Sec_WebSocket_Key = utils.gen_request(AUTH, SERVER_PORT)
     r_writer.write(handshake)
@@ -102,9 +106,10 @@ async def handle(reader, writer):
 
     # get handshake response
     response = []
-    for i in range(5):
-        response.append(await r_reader.readline())
-    response = b''.join(response)
+    #for i in range(5):
+    #    response.append(await r_reader.readline())
+    #response = b''.join(response)
+    response = await r_reader.readuntil(b'\r\n\r\n')
     response = response[:-4]
     response = response.split(b'\r\n')
     header = {}
@@ -163,18 +168,43 @@ async def handle(reader, writer):
 
     async def sock2remote():
         while True:
-            data = await reader.read(4096)
+            try:
+                data = await reader.read(4096)
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
             if not data:
-                logging.debug('relay stop')
+                logging.debug('relay stop {}:{}'.format(addr, port))
                 break
             data, tag = Encrypt.encrypt(data)
             content = utils.gen_local_frame(data + tag)
-            r_writer.write(content)
-            await r_writer.drain()
+
+            try:
+                r_writer.write(content)
+                await r_writer.drain()
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
 
     async def remote2sock():
         while True:
-            data = await get_content()
+            try:
+                data = await get_content()
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
             if not data:
                 logging.debug('relay stop')
                 break
@@ -184,8 +214,17 @@ async def handle(reader, writer):
                 data = Decrypt.decrypt(content, tag)
             except ValueError:
                 break
-            writer.write(data)
-            await writer.drain()
+
+            try:
+                writer.write(data)
+                await writer.drain()
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
 
     logging.debug('start relay')
 

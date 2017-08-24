@@ -88,11 +88,23 @@ async def handle(reader, writer):
     logging.debug('target {}:{}'.format(addr, port))
 
     # connect to target
-    r_reader, r_writer = await asyncio.open_connection(addr, port)
+    try:
+        r_reader, r_writer = await asyncio.open_connection(addr, port)
+    except OSError as e:
+        logging.error(e)
+        return None
 
     async def sock2remote():
         while True:
-            data = await get_content()
+            try:
+                data = await get_content()
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
             if not data:
                 logging.debug('relay stop')
                 break
@@ -102,19 +114,44 @@ async def handle(reader, writer):
                 data = Decrypt.decrypt(content, tag)
             except ValueError:
                 break
-            r_writer.write(data)
-            await r_writer.drain()
+
+            try:
+                r_writer.write(data)
+                await r_writer.drain()
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
 
     async def remote2sock():
         while True:
-            data = await r_reader.read(4096)
+            try:
+                data = await r_reader.read(4096)
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
             if not data:
-                logging.debug('relay stop')
+                logging.debug('relay stop {}:{}'.format(addr, port))
                 break
             data, tag = Encrypt.encrypt(data)
             content = utils.gen_server_frame(data + tag)
-            writer.write(content)
-            await writer.drain()
+            try:
+                writer.write(content)
+                await writer.drain()
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
 
     logging.debug('start relay')
 
