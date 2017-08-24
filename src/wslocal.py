@@ -147,8 +147,10 @@ async def handle(reader, writer):
     # resolve websocket frame
     async def get_content():
         FRO = await r_reader.read(1)  # (FIN, RSV * 3, optcode)
-        if not FRO:
-            return FRO
+        FRO = struct.unpack('>B', FRO)[0]
+        if FRO == 1 << 7 | 8:
+            logging.debug('receive close frame')
+            return None
 
         prefix = await r_reader.read(1)
         prefix = struct.unpack('>B', prefix)[0]
@@ -177,9 +179,22 @@ async def handle(reader, writer):
                 logging.error(e)
                 break
 
+            # close Connection
             if not data:
                 logging.debug('relay stop {}:{}'.format(addr, port))
+                close_frame = utils.gen_close_frame(True)
+                try:
+                    r_writer.write(close_frame)
+                    await r_writer.drain()
+                except ConnectionResetError as e:
+                    logging.error(e)
+                    break
+                except BrokenPipeError as e:
+                    logging.error(e)
+                    break
                 break
+
+            # send data
             data, tag = Encrypt.encrypt(data)
             content = utils.gen_local_frame(data + tag)
 
@@ -205,9 +220,22 @@ async def handle(reader, writer):
                 logging.error(e)
                 break
 
+            # close Connection
             if not data:
-                logging.debug('relay stop')
+                logging.debug('relay stop {}:{}'.format(addr, port))
+                close_frame = utils.gen_close_frame(True)
+                try:
+                    writer.write(close_frame)
+                    await writer.drain()
+                except ConnectionResetError as e:
+                    logging.error(e)
+                    break
+                except BrokenPipeError as e:
+                    logging.error(e)
+                    break
                 break
+
+            # send data
             tag = data[-16:]
             content = data[:-16]
             try:
