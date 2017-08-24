@@ -48,16 +48,18 @@ async def handle(reader, writer):
     writer.write(response)
 
     async def get_content():
-        FRO = await reader.read(1)  # (FIN, RSV * 3, optcode)
-        if not FRO:
+        try:
+            data = await reader.readexactly(2)  # (FIN, RSV * 3, optcode)
+        except asyncio.IncompleteReadError:
             return None
 
-        elif FRO == struct.pack('>B', 1 << 7 | 8):
+        FRO, prefix = data
+
+        if FRO == 1 << 7 | 8:
             logging.debug('receive close frame')
             return None
 
-        prefix = await reader.read(1)
-        prefix = struct.unpack('>B', prefix)[0] & 0x7f
+        prefix = prefix & 0x7f
         if prefix <= 125:
             payload_len = prefix
 
