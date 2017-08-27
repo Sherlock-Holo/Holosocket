@@ -8,10 +8,11 @@ import struct
 import utils
 from encrypt import aes_gcm
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='{asctime} {levelname} {message}',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    style='{')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='{asctime} {levelname} {message}',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    style='{')
 
 
 async def handle(reader, writer):
@@ -87,7 +88,7 @@ async def handle(reader, writer):
     data = data_to_send[:-16]
     content = Decrypt.decrypt(data, tag)
     addr_len = content[0]
-    addr = content[1: 1 + addr_len]
+    addr = content[1:1 + addr_len]
     _port = content[-2:]
     port = struct.unpack('>H', _port)[0]
     logging.debug('target {}:{}'.format(addr, port))

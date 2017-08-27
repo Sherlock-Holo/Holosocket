@@ -9,10 +9,11 @@ import struct
 import utils
 from encrypt import aes_gcm
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='{asctime} {levelname} {message}',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    style='{')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='{asctime} {levelname} {message}',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    style='{')
 
 
 async def handle(reader, writer):
@@ -120,10 +121,8 @@ async def handle(reader, writer):
             pass
 
     # certificate server handshake message
-    if not utils.certificate_key(
-        Sec_WebSocket_Key,
-        header['Sec-WebSocket-Accept']
-    ):
+    if not utils.certificate_key(Sec_WebSocket_Key,
+                                 header['Sec-WebSocket-Accept']):
         writer.close()
         r_writer.close()
         return None
