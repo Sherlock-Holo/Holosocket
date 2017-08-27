@@ -37,7 +37,6 @@ async def handle(reader, writer):
         except IndexError:
             # ignore HTTP/1.1 101 Switching Protocols
             pass
-    #logging.debug('header: {}'.format(header))
 
     # flitrate http request or attack request
     if not utils.certificate(header, AUTH, SERVER_PORT):
@@ -79,7 +78,6 @@ async def handle(reader, writer):
 
     # get salt
     salt = await get_content()
-    #logging.debug('salt: {}'.format(salt))
     Encrypt = aes_gcm(KEY, salt)
     Decrypt = aes_gcm(KEY, salt)
 
@@ -197,14 +195,12 @@ async def handle(reader, writer):
     s2r = asyncio.ensure_future(sock2remote())
     r2s = asyncio.ensure_future(remote2sock())
 
-    # expreriment
     s2r.add_done_callback(close_transport)
     r2s.add_done_callback(close_transport)
 
 
 if __name__ == '__main__':
-    #logging.info('start holosocket local')
-    parser = argparse.ArgumentParser(description='holosocket local')
+    parser = argparse.ArgumentParser(description='holosocket server')
     parser.add_argument('-c', '--config', help='config file')
     args = parser.parse_args()
     if args.config:
@@ -219,7 +215,7 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
     relay_loop = asyncio.get_event_loop()
-    coro = asyncio.start_server(handle, SERVER, SERVER_PORT, loop=loop)
+    coro = asyncio.start_server(handle, (SERVER, '::'), SERVER_PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
     try:

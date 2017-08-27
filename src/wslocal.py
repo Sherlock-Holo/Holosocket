@@ -26,7 +26,6 @@ async def handle(reader, writer):
         return None
     else:
         nmethods = request[1]
-        #logging.debug('methods number: {}'.format(nmethods))
         methods = await reader.read(nmethods)
         if 0 in methods:
             writer.write(b'\x05\x00')
@@ -106,9 +105,6 @@ async def handle(reader, writer):
 
     # get handshake response
     response = []
-    #for i in range(5):
-    #    response.append(await r_reader.readline())
-    #response = b''.join(response)
     response = await r_reader.readuntil(b'\r\n\r\n')
     response = response[:-4]
     response = response.split(b'\r\n')
@@ -134,7 +130,6 @@ async def handle(reader, writer):
 
     # send salt
     r_writer.write(utils.gen_local_frame(salt))
-    #logging.debug('salt: {}'.format(salt))
     await r_writer.drain()
 
     data_to_send, tag = Encrypt.encrypt(data_to_send)
@@ -266,13 +261,11 @@ async def handle(reader, writer):
     s2r = asyncio.ensure_future(sock2remote())
     r2s = asyncio.ensure_future(remote2sock())
 
-    # expreriment
     s2r.add_done_callback(close_transport)
     r2s.add_done_callback(close_transport)
 
 
 if __name__ == '__main__':
-    #logging.info('start holosocket local')
     parser = argparse.ArgumentParser(description='holosocket local')
     parser.add_argument('-c', '--config', help='config file')
     args = parser.parse_args()
