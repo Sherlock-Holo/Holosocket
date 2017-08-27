@@ -26,6 +26,7 @@ async def handle(reader, writer):
 
     if request[0] != b'GET /chat HTTP/1.1':
         writer.write(utils.not_found())
+        logging.warn('detect http request')
         writer.close()
         return None
 
