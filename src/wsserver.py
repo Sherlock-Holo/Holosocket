@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
-import functools
 import json
 import logging
 import struct
@@ -188,15 +187,17 @@ async def handle(reader, writer):
 
     logging.debug('start relay')
 
-    def close_transport(sock, *args):
-        sock.close()
+    def close_transport(future):
+        writer.close()
+        r_writer.close()
+        logging.debug('stop relay')
 
-    s2r = asyncio.ensure_future(sock2remote(), loop=relay_loop)
-    r2s = asyncio.ensure_future(remote2sock(), loop=relay_loop)
+    s2r = asyncio.ensure_future(sock2remote())
+    r2s = asyncio.ensure_future(remote2sock())
 
     # expreriment
-    s2r.add_done_callback(functools.partial(close_transport, writer))
-    r2s.add_done_callback(functools.partial(close_transport, r_writer))
+    s2r.add_done_callback(close_transport)
+    r2s.add_done_callback(close_transport)
 
 
 if __name__ == '__main__':
