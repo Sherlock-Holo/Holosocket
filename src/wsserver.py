@@ -215,7 +215,7 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
     relay_loop = asyncio.get_event_loop()
-    coro = asyncio.start_server(handle, (SERVER, '::'), SERVER_PORT, loop=loop)
+    coro = asyncio.start_server(handle, SERVER, SERVER_PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
     try:
