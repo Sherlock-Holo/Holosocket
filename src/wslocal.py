@@ -103,7 +103,7 @@ async def handle(reader, writer):
 
     handshake, Sec_WebSocket_Key = utils.gen_request(AUTH, SERVER_PORT)
     r_writer.write(handshake)
-    r_writer.drain()
+    await r_writer.drain()
 
     # get handshake response
     response = []
