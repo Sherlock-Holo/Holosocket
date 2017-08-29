@@ -47,6 +47,8 @@ async def handle(reader, writer):
     response = utils.gen_response(header['Sec-WebSocket-Key'])
     writer.write(response)
 
+    INITIATIVE_CLOSE = None
+
     async def get_content():
         try:
             data = await reader.readexactly(2)  # (FIN, RSV * 3, optcode)
@@ -112,18 +114,22 @@ async def handle(reader, writer):
 
             # close Connection
             if not data:
-                logging.debug('relay stop {}:{}'.format(addr, port))
-                close_frame = utils.gen_close_frame(False)
-                try:
-                    r_writer.write(close_frame)
-                    await r_writer.drain()
-                    break
-                except ConnectionResetError as e:
-                    logging.error(e)
-                    break
-                except BrokenPipeError as e:
-                    logging.error(e)
-                    break
+                if INITIATIVE_CLOSE == True:
+                    return None
+
+                else:
+                    logging.debug('relay stop {}:{}'.format(addr, port))
+                    close_frame = utils.gen_close_frame(False)
+                    try:
+                        r_writer.write(close_frame)
+                        await r_writer.drain()
+                        break
+                    except ConnectionResetError as e:
+                        logging.error(e)
+                        break
+                    except BrokenPipeError as e:
+                        logging.error(e)
+                        break
 
             # send data
             tag = data[-16:]
@@ -159,6 +165,8 @@ async def handle(reader, writer):
             # close Connection
             if not data:
                 logging.debug('relay stop {}:{}'.format(addr, port))
+                # server initiative close
+                INITIATIVE_CLOSE = True
                 close_frame = utils.gen_close_frame(False)
                 try:
                     writer.write(close_frame)

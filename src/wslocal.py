@@ -92,6 +92,8 @@ async def handle(reader, writer):
     writer.write(b''.join(data))
     await writer.drain()
 
+    INITIATIVE_CLOSE = None
+
     # connect to server
     try:
         r_reader, r_writer = await asyncio.open_connection(SERVER, SERVER_PORT)
@@ -178,6 +180,8 @@ async def handle(reader, writer):
             # close Connection
             if not data:
                 logging.debug('relay stop {}:{}'.format(addr, port))
+                # local initiative close
+                INITIATIVE_CLOSE = True
                 close_frame = utils.gen_close_frame(True)
                 try:
                     r_writer.write(close_frame)
@@ -218,18 +222,22 @@ async def handle(reader, writer):
 
             # close Connection
             if not data:
-                logging.debug('relay stop {}:{}'.format(addr, port))
-                close_frame = utils.gen_close_frame(True)
-                try:
-                    writer.write(close_frame)
-                    await writer.drain()
-                    break
-                except ConnectionResetError as e:
-                    logging.error(e)
-                    break
-                except BrokenPipeError as e:
-                    logging.error(e)
-                    break
+                if INITIATIVE_CLOSE == True:
+                    return None
+
+                else:
+                    logging.debug('relay stop {}:{}'.format(addr, port))
+                    close_frame = utils.gen_close_frame(True)
+                    try:
+                        writer.write(close_frame)
+                        await writer.drain()
+                        break
+                    except ConnectionResetError as e:
+                        logging.error(e)
+                        break
+                    except BrokenPipeError as e:
+                        logging.error(e)
+                        break
 
             # send data
             tag = data[-16:]
