@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import functools
 import json
 import logging
 import struct
@@ -15,51 +16,171 @@ logging.basicConfig(
     style='{')
 
 
-async def handle(reader, writer):
-    # get local handshake message
-    request = []
-    for i in range(7):
-        request.append(await reader.readline())
-    request = b''.join(request)
-    request = request[:-4]
-    request = request.split(b'\r\n')
+class Server:
 
-    if request[0] != b'GET /chat HTTP/1.1':
-        writer.write(utils.not_found())
-        logging.warn('detect http request')
-        writer.close()
-        return None
+    async def handle(self, reader, writer):
+        # get local handshake message
+        request = []
+        for i in range(7):
+            request.append(await reader.readline())
+        request = b''.join(request)
+        request = request[:-4]
+        request = request.split(b'\r\n')
 
-    header = {}
-    for i in request:
-        try:
+        if request[0] != b'GET /chat HTTP/1.1':
+            writer.write(utils.not_found())
+            logging.warn('detect http request')
+            writer.close()
+            return None
+
+        header = {}
+        for i in request[1:]:
             header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
-        except IndexError:
-            # ignore HTTP/1.1 101 Switching Protocols
-            pass
 
-    # flitrate http request or attack request
-    if not utils.certificate(header, AUTH, SERVER_PORT):
-        writer.write(utils.not_found())
+        # flitrate http request or attack request
+        if not utils.certificate(header, AUTH, SERVER_PORT):
+            writer.write(utils.not_found())
+            writer.close()
+            return None
+
+        response = utils.gen_response(header['Sec-WebSocket-Key'])
+        writer.write(response)
+
+        # get salt
+        salt = await self.get_content(reader)
+        Encrypt = aes_gcm(KEY, salt)
+        Decrypt = aes_gcm(KEY, salt)
+
+        # get target addr, port
+        data_to_send = await self.get_content(reader)
+        tag = data_to_send[-16:]
+        data = data_to_send[:-16]
+        content = Decrypt.decrypt(data, tag)
+        addr_len = content[0]
+        addr = content[1:1 + addr_len]
+        _port = content[-2:]
+        port = struct.unpack('>H', _port)[0]
+        #logging.debug('target {}:{}'.format(addr, port))
+
+        # connect to target
+        try:
+            r_reader, r_writer = await asyncio.open_connection(addr, port)
+
+        except OSError as e:
+            logging.error(e)
+            return None
+
+        logging.debug('start relay')
+
+        s2r = asyncio.ensure_future(
+            self.sock2remote(reader, r_writer, Decrypt))
+
+        r2s = asyncio.ensure_future(
+            self.remote2sock(r_reader, writer, Encrypt))
+
+        s2r.add_done_callback(
+            functools.partial(self.close_transport, writer))
+
+        r2s.add_done_callback(
+            functools.partial(self.close_transport, r_writer))
+
+    async def sock2remote(self, reader, writer, cipher):
+        while True:
+            try:
+                data = await self.get_content(reader)
+
+            except OSError as e:
+                logging.error(e)
+                break
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
+            # close Connection
+            if not data:
+                break
+
+            # send data
+            tag = data[-16:]
+            content = data[:-16]
+            try:
+                data = cipher.decrypt(content, tag)
+            except ValueError:
+                logging.warn('detect attack')
+                break
+
+            try:
+                writer.write(data)
+                await writer.drain()
+
+            except OSError as e:
+                logging.error(e)
+                break
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
+    async def remote2sock(self, reader, writer, cipher):
+        while True:
+            try:
+                data = await reader.read(4096)
+
+            except OSError as e:
+                logging.error(e)
+                break
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
+            # close Connection
+            if not data:
+                break
+
+            # send data
+            data, tag = cipher.encrypt(data)
+            content = utils.gen_server_frame(data + tag)
+            try:
+                writer.write(content)
+                await writer.drain()
+
+            except OSError as e:
+                logging.error(e)
+                break
+
+            except ConnectionResetError as e:
+                logging.error(e)
+                break
+
+            except BrokenPipeError as e:
+                logging.error(e)
+                break
+
+    def close_transport(self, writer, future):
         writer.close()
-        return None
+        r_writer.close()
+        logging.debug('stop relay')
 
-    response = utils.gen_response(header['Sec-WebSocket-Key'])
-    writer.write(response)
-
-    INITIATIVE_CLOSE = None
-
-    async def get_content():
+    async def get_content(self, reader):
         try:
             data = await reader.readexactly(2)  # (FIN, RSV * 3, optcode)
         except asyncio.IncompleteReadError:
             return None
 
         FRO, prefix = data
-
-        if FRO == 1 << 7 | 8:
-            logging.debug('receive close frame')
-            return None
 
         prefix = prefix & 0x7f
         if prefix <= 125:
@@ -78,134 +199,6 @@ async def handle(reader, writer):
         content = utils.mask(payload, mask_key)[0]
         return content
 
-    # get salt
-    salt = await get_content()
-    Encrypt = aes_gcm(KEY, salt)
-    Decrypt = aes_gcm(KEY, salt)
-
-    # get target addr, port
-    data_to_send = await get_content()
-    tag = data_to_send[-16:]
-    data = data_to_send[:-16]
-    content = Decrypt.decrypt(data, tag)
-    addr_len = content[0]
-    addr = content[1:1 + addr_len]
-    _port = content[-2:]
-    port = struct.unpack('>H', _port)[0]
-    logging.debug('target {}:{}'.format(addr, port))
-
-    # connect to target
-    try:
-        r_reader, r_writer = await asyncio.open_connection(addr, port)
-    except OSError as e:
-        logging.error(e)
-        return None
-
-    async def sock2remote():
-        while True:
-            try:
-                data = await get_content()
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            # close Connection
-            if not data:
-                if INITIATIVE_CLOSE == True:
-                    return None
-
-                else:
-                    logging.debug('relay stop {}:{}'.format(addr, port))
-                    close_frame = utils.gen_close_frame(False)
-                    try:
-                        r_writer.write(close_frame)
-                        await r_writer.drain()
-                        break
-                    except ConnectionResetError as e:
-                        logging.error(e)
-                        break
-                    except BrokenPipeError as e:
-                        logging.error(e)
-                        break
-
-            # send data
-            tag = data[-16:]
-            content = data[:-16]
-            try:
-                data = Decrypt.decrypt(content, tag)
-            except ValueError:
-                logging.warn('detect attack')
-                break
-
-            try:
-                r_writer.write(data)
-                await r_writer.drain()
-
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-    async def remote2sock():
-        while True:
-            try:
-                data = await r_reader.read(4096)
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            # close Connection
-            if not data:
-                logging.debug('relay stop {}:{}'.format(addr, port))
-                # server initiative close
-                INITIATIVE_CLOSE = True
-                close_frame = utils.gen_close_frame(False)
-                try:
-                    writer.write(close_frame)
-                    await writer.drain()
-                    break
-                except ConnectionResetError as e:
-                    logging.error(e)
-                    break
-                except BrokenPipeError as e:
-                    logging.error(e)
-                    break
-
-            # send data
-            data, tag = Encrypt.encrypt(data)
-            content = utils.gen_server_frame(data + tag)
-            try:
-                writer.write(content)
-                await writer.drain()
-
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-    logging.debug('start relay')
-
-    def close_transport(future):
-        writer.close()
-        r_writer.close()
-        logging.debug('stop relay')
-
-    s2r = asyncio.ensure_future(sock2remote())
-    r2s = asyncio.ensure_future(remote2sock())
-
-    s2r.add_done_callback(close_transport)
-    r2s.add_done_callback(close_transport)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='holosocket server')
@@ -221,9 +214,11 @@ if __name__ == '__main__':
     KEY = config['password']
     AUTH = config['auth_addr']
 
+    server = Server()
+
     loop = asyncio.get_event_loop()
     relay_loop = asyncio.get_event_loop()
-    coro = asyncio.start_server(handle, SERVER, SERVER_PORT, loop=loop)
+    coro = asyncio.start_server(server.handle, SERVER, SERVER_PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
     try:
