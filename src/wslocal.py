@@ -150,20 +150,33 @@ class Server:
             self.remote2sock(r_reader, writer, Decrypt))
 
         s2r.add_done_callback(
-            functools.partial(self.close_transport, writer))
+            functools.partial(self.close_transport, writer, r_writer))
 
         r2s.add_done_callback(
-            functools.partial(self.close_transport, r_writer))
+            functools.partial(self.close_transport, writer, r_writer))
 
-    def close_transport(self, writer, future):
+    def close_transport(self, writer, r_writer, future):
         writer.close()
+        r_writer.close()
         logging.debug('stop relay')
 
     # resolve websocket frame
     async def get_content(self, reader):
         try:
-            data = await reader.readexactly(2)  # (FIN, RSV * 3, optcode)
-        except asyncio.IncompleteReadError:
+            data = await reader.read(2)  # (FIN, RSV * 3, optcode)
+        except OSError as e:
+            logging.error(e)
+            return None
+
+        except ConnectionResetError as e:
+            logging.error(e)
+            return None
+
+        except BrokenPipeError as e:
+            logging.error(e)
+            return None
+
+        if not data:
             return None
 
         FRO, prefix = data
