@@ -156,6 +156,8 @@ def certificate(header, addr, port):
 
 
 def not_found():
-    data = b'HTTP/1.1 404 Not Found\r\n'
-    data += b'Connection: Closed\r\n\r\n'
-    return data
+    data = [
+        b'HTTP/1.1 404 Not Found\r\n',
+        b'Connection: Closed\r\n\r\n'
+        ]
+    return b''.join(data)
