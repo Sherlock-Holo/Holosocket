@@ -85,32 +85,19 @@ class Server:
             try:
                 data = await self.get_content(reader)
 
-            except OSError as e:
-                logging.error(e)
-                break
+                # close Connection
+                if not data:
+                    break
 
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
+                # send data
+                tag = data[-16:]
+                content = data[:-16]
+                try:
+                    data = cipher.decrypt(content, tag)
+                except ValueError:
+                    logging.warn('detect attack')
+                    return None
 
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            # close Connection
-            if not data:
-                break
-
-            # send data
-            tag = data[-16:]
-            content = data[:-16]
-            try:
-                data = cipher.decrypt(content, tag)
-            except ValueError:
-                logging.warn('detect attack')
-                return None
-
-            try:
                 writer.write(data)
                 await writer.drain()
 
@@ -130,26 +117,14 @@ class Server:
             try:
                 data = await reader.read(8192)
 
-            except OSError as e:
-                logging.error(e)
-                break
+                # close Connection
+                if not data:
+                    break
 
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
+                # send data
+                data, tag = cipher.encrypt(data)
+                content = utils.gen_server_frame(data + tag)
 
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            # close Connection
-            if not data:
-                break
-
-            # send data
-            data, tag = cipher.encrypt(data)
-            content = utils.gen_server_frame(data + tag)
-            try:
                 writer.write(content)
                 await writer.drain()
 
@@ -173,6 +148,40 @@ class Server:
     async def get_content(self, reader):
         try:
             data = await reader.read(2)  # (FIN, RSV * 3, optcode)
+
+            if not data:
+                return None
+
+            FRO, prefix = data
+
+            prefix = prefix & 0x7f
+            if prefix <= 125:
+                payload_len = prefix
+
+            elif prefix == 126:
+                _payload_len = await reader.read(2)
+                payload_len = struct.unpack('>H', _payload_len)[0]
+
+            elif prefix == 127:
+                _payload_len = await reader.read(8)
+                payload_len = struct.unpack('>Q', _payload_len)[0]
+
+            mask_key = await reader.read(4)
+
+            content_len = 0
+            content = []
+
+            while True:
+                data = await reader.read(payload_len - content_len)
+                content.append(data)
+                content_len += len(data)
+                if content_len == payload_len:
+                    break
+
+            payload = b''.join(content)
+            content = utils.mask(payload, mask_key)[0]
+            return content
+
         except OSError as e:
             logging.error(e)
             return None
@@ -184,39 +193,6 @@ class Server:
         except BrokenPipeError as e:
             logging.error(e)
             return None
-
-        if not data:
-            return None
-
-        FRO, prefix = data
-
-        prefix = prefix & 0x7f
-        if prefix <= 125:
-            payload_len = prefix
-
-        elif prefix == 126:
-            _payload_len = await reader.read(2)
-            payload_len = struct.unpack('>H', _payload_len)[0]
-
-        elif prefix == 127:
-            _payload_len = await reader.read(8)
-            payload_len = struct.unpack('>Q', _payload_len)[0]
-
-        mask_key = await reader.read(4)
-
-        content_len = 0
-        content = []
-
-        while True:
-            data = await reader.read(payload_len - content_len)
-            content.append(data)
-            content_len += len(data)
-            if content_len == payload_len:
-                break
-
-        payload = b''.join(content)
-        content = utils.mask(payload, mask_key)[0]
-        return content
 
 
 if __name__ == '__main__':
