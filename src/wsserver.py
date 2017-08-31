@@ -7,7 +7,7 @@ import logging
 import struct
 
 import utils
-from encrypt import aes_cfb
+from encrypt import aes_gcm
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -48,15 +48,15 @@ class Server:
         writer.write(response)
 
         # get salt
-        iv = await self.get_content(reader)
-        Encrypt = aes_cfb(KEY, iv)
-        Decrypt = aes_cfb(KEY, iv)
+        salt = await self.get_content(reader)
+        Encrypt = aes_gcm(KEY, salt)
+        Decrypt = aes_gcm(KEY, salt)
 
         # get target addr, port
         data_to_send = await self.get_content(reader)
-        #tag = data_to_send[-16:]
-        #data = data_to_send[:-16]
-        content = Decrypt.decrypt(data_to_send)
+        tag = data_to_send[-16:]
+        data = data_to_send[:-16]
+        content = Decrypt.decrypt(data, tag)
         addr_len = content[0]
         addr = content[1:1 + addr_len]
         _port = content[-2:]
@@ -107,9 +107,13 @@ class Server:
                 break
 
             # send data
-            #tag = data[-16:]
-            #content = data[:-16]
-            data = cipher.decrypt(data)
+            tag = data[-16:]
+            content = data[:-16]
+            try:
+                data = cipher.decrypt(content, tag)
+            except ValueError:
+                logging.warn('detect attack')
+                return None
 
             try:
                 writer.write(data)
@@ -148,8 +152,8 @@ class Server:
                 break
 
             # send data
-            data = cipher.encrypt(data)
-            content = utils.gen_server_frame(data)
+            data, tag = cipher.encrypt(data)
+            content = utils.gen_server_frame(data + tag)
             try:
                 writer.write(content)
                 await writer.drain()

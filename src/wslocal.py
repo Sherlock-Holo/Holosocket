@@ -9,7 +9,7 @@ import socket
 import struct
 
 import utils
-from encrypt import aes_cfb
+from encrypt import aes_gcm
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -128,16 +128,16 @@ class Server:
             return None
         #logging.debug('handshake done')
 
-        Encrypt = aes_cfb(KEY)
-        iv = Encrypt.iv
-        Decrypt = aes_cfb(KEY, iv)
+        Encrypt = aes_gcm(KEY)
+        salt = Encrypt.salt
+        Decrypt = aes_gcm(KEY, salt)
 
         # send salt
-        r_writer.write(utils.gen_local_frame(iv))
+        r_writer.write(utils.gen_local_frame(salt))
         await r_writer.drain()
 
-        data_to_send = Encrypt.encrypt(data_to_send)
-        content = utils.gen_local_frame(data_to_send)
+        data_to_send, tag = Encrypt.encrypt(data_to_send)
+        content = utils.gen_local_frame(data_to_send + tag)
         r_writer.write(content)
         await r_writer.drain()
 
@@ -180,9 +180,6 @@ class Server:
             return None
 
         FRO, prefix = data
-
-        logging.debug('FRO {}'.format(FRO))
-        logging.debug('prefix {}'.format(prefix))
 
         if prefix <= 125:
             payload_len = prefix
@@ -229,8 +226,8 @@ class Server:
                 break
 
             # send data
-            data = cipher.encrypt(data)
-            content = utils.gen_local_frame(data)
+            data, tag = cipher.encrypt(data)
+            content = utils.gen_local_frame(data + tag)
 
             try:
                 writer.write(content)
@@ -270,9 +267,13 @@ class Server:
                 break
 
             # send data
-            #tag = data[-16:]
-            #content = data[:-16]
-            data = cipher.decrypt(data)
+            tag = data[-16:]
+            content = data[:-16]
+            try:
+                data = cipher.decrypt(content, tag)
+            except ValueError:
+                logging.warn('detect attack')
+                return None
 
             try:
                 writer.write(data)
