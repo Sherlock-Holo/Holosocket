@@ -20,11 +20,7 @@ class Server:
 
     async def handle(self, reader, writer):
         # get local handshake message
-        #request = []
-        #for i in range(7):
-        #    request.append(await reader.readline())
         request = await reader.readuntil(b'\r\n\r\n')
-        #request = b''.join(request)
         request = request[:-4]
         request = request.split(b'\r\n')
 
@@ -61,7 +57,6 @@ class Server:
         addr = content[1:1 + addr_len]
         _port = content[-2:]
         port = struct.unpack('>H', _port)[0]
-        #logging.debug('target {}:{}'.format(addr, port))
 
         # connect to target
         try:

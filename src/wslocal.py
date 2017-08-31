@@ -21,9 +21,6 @@ logging.basicConfig(
 class Server:
 
     async def handle(self, reader, writer):
-        #logging.debug(
-        #    'connect from {}'.format(writer.get_extra_info('peername')))
-
         request = await reader.read(2)
         # socks version not support
         if request[0] != 5:
@@ -70,9 +67,7 @@ class Server:
             _addr = await reader.read(16)
             addr = socket.inet_ntop(socket.AF_INET6, _addr)
 
-        _port = await reader.read(2)
-        #port = struct.unpack('>H', _port)[0]
-        #logging.debug('remote: {}:{}'.format(addr, port))
+        port = await reader.read(2)
 
         # send target addr and port to server
         data_to_send = []
@@ -87,7 +82,7 @@ class Server:
         elif atyp == 4:
             data_to_send.append(socket.inet_pton(socket.AF_INET6, addr))
 
-        data_to_send.append(_port)
+        data_to_send.append(port)
         data_to_send = b''.join(data_to_send)
 
         # success response
@@ -112,7 +107,6 @@ class Server:
         await r_writer.drain()
 
         # get handshake response
-        #response = []
         response = await r_reader.readuntil(b'\r\n\r\n')
         response = response[:-4]
         response = response.split(b'\r\n')
@@ -126,7 +120,6 @@ class Server:
             writer.close()
             r_writer.close()
             return None
-        #logging.debug('handshake done')
 
         Encrypt = aes_gcm(KEY)
         salt = Encrypt.salt
@@ -222,7 +215,6 @@ class Server:
 
             # close Connection
             if not data:
-                #logging.debug('relay stop')
                 break
 
             # send data
