@@ -117,16 +117,15 @@ def gen_local_frame(content):
 
 
 def gen_server_frame(content):
-    data = [struct.pack('>B', 1 << 7 | 2)]
+    data = struct.pack('>B', 1 << 7 | 2)
     prefix, content_len = gen_data_len(False, content)
     if content_len == 0:
-        data.append(prefix)
+        data += prefix
     else:
-        data.append(prefix)
-        data.append(content_len)
+        data += prefix + content_len
 
-    data.append(content)
-    return b''.join(data)
+    data += content
+    return data
 
 # deprecated
 def gen_close_frame(mask):
