@@ -9,7 +9,7 @@ import socket
 import struct
 
 import utils
-from encrypt import aes_gcm
+from encrypt import aes_cfb
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -71,7 +71,7 @@ class Server:
             addr = socket.inet_ntop(socket.AF_INET6, _addr)
 
         _port = await reader.read(2)
-        port = struct.unpack('>H', _port)[0]
+        #port = struct.unpack('>H', _port)[0]
         #logging.debug('remote: {}:{}'.format(addr, port))
 
         # send target addr and port to server
@@ -128,16 +128,16 @@ class Server:
             return None
         #logging.debug('handshake done')
 
-        Encrypt = aes_gcm(KEY)
-        salt = Encrypt.salt
-        Decrypt = aes_gcm(KEY, salt)
+        Encrypt = aes_cfb(KEY)
+        iv = Encrypt.iv
+        Decrypt = aes_cfb(KEY, iv)
 
         # send salt
-        r_writer.write(utils.gen_local_frame(salt))
+        r_writer.write(utils.gen_local_frame(iv))
         await r_writer.drain()
 
-        data_to_send, tag = Encrypt.encrypt(data_to_send)
-        content = utils.gen_local_frame(data_to_send + tag)
+        data_to_send = Encrypt.encrypt(data_to_send)
+        content = utils.gen_local_frame(data_to_send)
         r_writer.write(content)
         await r_writer.drain()
 
@@ -218,8 +218,8 @@ class Server:
                 break
 
             # send data
-            data, tag = cipher.encrypt(data)
-            content = utils.gen_local_frame(data + tag)
+            data = cipher.encrypt(data)
+            content = utils.gen_local_frame(data)
 
             try:
                 writer.write(content)
@@ -259,13 +259,9 @@ class Server:
                 break
 
             # send data
-            tag = data[-16:]
-            content = data[:-16]
-            try:
-                data = cipher.decrypt(content, tag)
-            except ValueError:
-                logging.warn('detect attack')
-                break
+            #tag = data[-16:]
+            #content = data[:-16]
+            data = cipher.decrypt(data)
 
             try:
                 writer.write(data)
