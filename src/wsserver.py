@@ -20,10 +20,11 @@ class Server:
 
     async def handle(self, reader, writer):
         # get local handshake message
-        request = []
-        for i in range(7):
-            request.append(await reader.readline())
-        request = b''.join(request)
+        #request = []
+        #for i in range(7):
+        #    request.append(await reader.readline())
+        request = await reader.readuntil(b'\r\n\r\n')
+        #request = b''.join(request)
         request = request[:-4]
         request = request.split(b'\r\n')
 
@@ -128,7 +129,7 @@ class Server:
     async def remote2sock(self, reader, writer, cipher):
         while True:
             try:
-                data = await reader.read(4096)
+                data = await reader.read(8192)
 
             except OSError as e:
                 logging.error(e)
@@ -203,7 +204,18 @@ class Server:
             payload_len = struct.unpack('>Q', _payload_len)[0]
 
         mask_key = await reader.read(4)
-        payload = await reader.read(payload_len)
+
+        content_len = 0
+        content = []
+
+        while True:
+            data = await reader.read(payload_len - content_len)
+            content.append(data)
+            content_len += len(data)
+            if content_len == payload_len:
+                break
+
+        payload = b''.join(content)
         content = utils.mask(payload, mask_key)[0]
         return content
 

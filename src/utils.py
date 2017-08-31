@@ -1,6 +1,5 @@
 import base64
 import hashlib
-import logging
 import secrets
 import struct
 

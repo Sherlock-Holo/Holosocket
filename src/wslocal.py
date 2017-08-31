@@ -112,7 +112,7 @@ class Server:
         await r_writer.drain()
 
         # get handshake response
-        response = []
+        #response = []
         response = await r_reader.readuntil(b'\r\n\r\n')
         response = response[:-4]
         response = response.split(b'\r\n')
@@ -181,6 +181,9 @@ class Server:
 
         FRO, prefix = data
 
+        logging.debug('FRO {}'.format(FRO))
+        logging.debug('prefix {}'.format(prefix))
+
         if prefix <= 125:
             payload_len = prefix
 
@@ -192,13 +195,21 @@ class Server:
             _payload_len = await reader.read(8)
             payload_len = struct.unpack('>Q', _payload_len)[0]
 
-        content = await reader.read(payload_len)
-        return content
+        content_len = 0
+        content = []
+
+        while True:
+            data = await reader.read(payload_len - content_len)
+            content.append(data)
+            content_len += len(data)
+            if content_len == payload_len:
+                break
+        return b''.join(content)
 
     async def sock2remote(self, reader, writer, cipher):
         while True:
             try:
-                data = await reader.read(4096)
+                data = await reader.read(8192)
 
             except OSError as e:
                 logging.error(e)
