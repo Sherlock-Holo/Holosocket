@@ -9,8 +9,7 @@ def gen_data_len(mask_flag, data):
     data_len = len(data)
     if mask_flag:
         if data_len <= 125:
-            data_len = data_len | 128
-            data_len = struct.pack('>B', data_len)
+            data_len = struct.pack('>B', data_len | 128)
             return data_len, 0
 
         elif data_len <= 65535:
@@ -103,16 +102,18 @@ def mask(data, mask_key=None):
 
 
 def gen_local_frame(content):
-    data = struct.pack('>B', 1 << 7 | 2)
+    data = [struct.pack('>B', 1 << 7 | 2)]
     prefix, content_len = gen_data_len(True, content)
     if content_len == 0:
-        data += prefix
+        data.append(prefix)
     else:
-        data += prefix + content_len
+        data.append(prefix)
+        data.append(content_len)
 
     content, mask_key = mask(content)
-    data += mask_key + content
-    return data
+    data.append(mask_key)
+    data.append(content)
+    return b''.join(data)
 
 
 def gen_server_frame(content):
@@ -126,7 +127,7 @@ def gen_server_frame(content):
     data += content
     return data
 
-
+# deprecated
 def gen_close_frame(mask):
     if mask:
         data = struct.pack('>B', 1 << 7 | 8)
