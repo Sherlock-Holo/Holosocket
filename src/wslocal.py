@@ -153,49 +153,6 @@ class Server:
         r_writer.close()
         logging.debug('stop relay')
 
-    # resolve websocket frame
-    async def get_content(self, reader):
-        try:
-            data = await reader.read(2)  # (FIN, RSV * 3, optcode)
-
-            if not data:
-                return None
-
-            FRO, prefix = data
-
-            if prefix <= 125:
-                payload_len = prefix
-
-            elif prefix == 126:
-                _payload_len = await reader.read(2)
-                payload_len = struct.unpack('>H', _payload_len)[0]
-
-            elif prefix == 127:
-                _payload_len = await reader.read(8)
-                payload_len = struct.unpack('>Q', _payload_len)[0]
-
-            content_len = 0
-            content = []
-
-            while True:
-                data = await reader.read(payload_len - content_len)
-                content.append(data)
-                content_len += len(data)
-                if content_len == payload_len:
-                    break
-            return b''.join(content)
-
-        except OSError as e:
-            logging.error(e)
-            return None
-
-        except ConnectionResetError as e:
-            logging.error(e)
-            return None
-
-        except BrokenPipeError as e:
-            logging.error(e)
-            return None
 
     async def sock2remote(self, reader, writer, cipher):
         while True:

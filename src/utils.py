@@ -164,6 +164,7 @@ def not_found():
     return b''.join(data)
 
 
+# resolve websocket frame
 async def get_content(reader, is_server, mask_key=None):
     try:
         data = await reader.read(2)  # (FIN, RSV * 3, optcode)
