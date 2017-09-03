@@ -44,12 +44,12 @@ class Server:
         writer.write(response)
 
         # get salt
-        salt = await self.get_content(reader)
+        salt = await utils.get_content(reader, True)
         Encrypt = aes_gcm(KEY, salt)
         Decrypt = aes_gcm(KEY, salt)
 
         # get target addr, port
-        data_to_send = await self.get_content(reader)
+        data_to_send = await utils.get_content(reader, True)
         tag = data_to_send[-16:]
         data = data_to_send[:-16]
         content = Decrypt.decrypt(data, tag)
@@ -83,7 +83,7 @@ class Server:
     async def sock2remote(self, reader, writer, cipher):
         while True:
             try:
-                data = await self.get_content(reader)
+                data = await utils.get_content(reader, True)
 
                 # close Connection
                 if not data:

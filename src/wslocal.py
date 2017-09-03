@@ -229,7 +229,7 @@ class Server:
     async def remote2sock(self, reader, writer, cipher):
         while True:
             try:
-                data = await self.get_content(reader)
+                data = await utils.get_content(reader, False)
 
                 # close Connection
                 if not data:

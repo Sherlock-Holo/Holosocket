@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import logging
 import secrets
 import struct
 
@@ -161,3 +162,59 @@ def not_found():
         b'Connection: Closed\r\n\r\n'
         ]
     return b''.join(data)
+
+
+async def get_content(reader, is_server, mask_key=None):
+    try:
+        data = await reader.read(2)  # (FIN, RSV * 3, optcode)
+
+        if not data:
+            return None
+
+        FRO, prefix = data
+        if is_server:
+            prefix = prefix & 0x7f
+
+        if prefix <= 125:
+            payload_len = prefix
+
+        elif prefix == 126:
+            _payload_len = await reader.read(2)
+            payload_len = struct.unpack('>H', _payload_len)[0]
+
+        elif prefix == 127:
+            _payload_len = await reader.read(8)
+            payload_len = struct.unpack('>Q', _payload_len)[0]
+
+        if is_server:
+            mask_key = await reader.read(4)
+
+        content_len = 0
+        content = []
+
+        while True:
+            data = await reader.read(payload_len - content_len)
+            content.append(data)
+            content_len += len(data)
+            if content_len == payload_len:
+                break
+
+        if is_server:
+            payload = b''.join(content)
+            content = mask(payload, mask_key)[0]
+            return content
+
+        else:
+            return b''.join(content)
+
+    except OSError as e:
+        logging.error(e)
+        return None
+
+    except ConnectionResetError as e:
+        logging.error(e)
+        return None
+
+    except BrokenPipeError as e:
+        logging.error(e)
+        return None
