@@ -71,6 +71,7 @@ class Server:
                     data = cipher.decrypt(content, tag)
                 except ValueError:
                     logging.warn('detect attack')
+                    await asyncio.sleep(90)
                     return None
 
                 writer.write(data)
