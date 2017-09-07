@@ -1,6 +1,9 @@
 # Holosocket
-a websocket proxy
+a simple websocket proxy
 
 ## Require
-* python >= 3.6
-* python3-pycryptodomex
+* python >= 3.5
+* python3-pycryptodomex (AES-GCM encrypt)
+* python-yaml (parse yaml config file)
+
+## Usage
