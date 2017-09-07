@@ -17,32 +17,7 @@ logging.basicConfig(
 
 
 class Server:
-
     async def handle(self, reader, writer):
-        # get local handshake message
-        request = await reader.readuntil(b'\r\n\r\n')
-        request = request[:-4]
-        request = request.split(b'\r\n')
-
-        if request[0] != b'GET /chat HTTP/1.1':
-            writer.write(utils.not_found())
-            logging.warn('detect http request')
-            writer.close()
-            return None
-
-        header = {}
-        for i in request[1:]:
-            header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
-
-        # flitrate http request or attack request
-        if not utils.certificate(header, AUTH, SERVER_PORT):
-            writer.write(utils.not_found())
-            writer.close()
-            return None
-
-        response = utils.gen_response(header['Sec-WebSocket-Key'])
-        writer.write(response)
-
         # get salt
         salt = await utils.get_content(reader, True)
         Encrypt = aes_gcm(KEY, salt)

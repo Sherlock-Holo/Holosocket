@@ -19,7 +19,6 @@ logging.basicConfig(
 
 
 class Server:
-
     async def handle(self, reader, writer):
         request = await reader.read(2)
         # socks version not support
@@ -102,25 +101,6 @@ class Server:
             logging.error(e)
             return None
 
-        handshake, Sec_WebSocket_Key = utils.gen_request(AUTH, SERVER_PORT)
-        r_writer.write(handshake)
-        await r_writer.drain()
-
-        # get handshake response
-        response = await r_reader.readuntil(b'\r\n\r\n')
-        response = response[:-4]
-        response = response.split(b'\r\n')
-        header = {}
-        for i in response[1:]:
-            header[i.split(b': ')[0].decode()] = i.split(b': ')[1]
-
-        # certificate server handshake message
-        if not utils.certificate_key(Sec_WebSocket_Key,
-                                     header['Sec-WebSocket-Accept']):
-            writer.close()
-            r_writer.close()
-            return None
-
         Encrypt = aes_gcm(KEY)
         salt = Encrypt.salt
         Decrypt = aes_gcm(KEY, salt)
@@ -153,7 +133,6 @@ class Server:
         r_writer.close()
         logging.debug('stop relay')
 
-
     async def sock2remote(self, reader, writer, cipher):
         while True:
             try:
@@ -166,7 +145,6 @@ class Server:
                 # send data
                 data, tag = cipher.encrypt(data)
                 content = utils.gen_local_frame(data + tag)
-
 
                 writer.write(content)
                 await writer.drain()
