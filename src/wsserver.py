@@ -11,8 +11,8 @@ try:
 except ImportError:
     from yaml import Loader
 
-import utils
-from encrypt import aes_gcm
+from . import utils
+from .encrypt import aes_gcm
 
 logging.basicConfig(
     level=logging.DEBUG,
