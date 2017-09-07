@@ -24,6 +24,11 @@ logging.basicConfig(
 
 
 class Server:
+    def __init__(self, server, server_port, key):
+        self.server = server
+        self.server_port = server_port
+        self.key = key
+
     async def handle(self, reader, writer):
         request = await reader.read(2)
         # socks version not support
@@ -100,15 +105,15 @@ class Server:
         # connect to server
         try:
             r_reader, r_writer = await asyncio.open_connection(
-                SERVER, SERVER_PORT)
+                self.server, self.server_port)
 
         except OSError as e:
             logging.error(e)
             return None
 
-        Encrypt = aes_gcm(KEY)
+        Encrypt = aes_gcm(self.key)
         salt = Encrypt.salt
-        Decrypt = aes_gcm(KEY, salt)
+        Decrypt = aes_gcm(self.key, salt)
 
         # send salt
         r_writer.write(utils.gen_local_frame(salt))
@@ -201,7 +206,7 @@ class Server:
                 break
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='holosocket local')
     parser.add_argument('-c', '--config', help='config file')
     args = parser.parse_args()
@@ -215,7 +220,7 @@ if __name__ == '__main__':
     PORT = config['local_port']
     KEY = config['password']
 
-    server = Server()
+    server = Server(SERVER, SERVER_PORT, KEY)
 
     loop = asyncio.get_event_loop()
     coro = asyncio.start_server(server.handle, LOCAL, PORT, loop=loop)
@@ -230,3 +235,7 @@ if __name__ == '__main__':
     server.close()
     loop.run_until_complete(server.wait_closed())
     loop.close()
+
+
+if __name__ == '__main__':
+    main()

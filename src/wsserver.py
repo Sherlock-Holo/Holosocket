@@ -22,11 +22,14 @@ logging.basicConfig(
 
 
 class Server:
+    def __init__(self, key):
+        self.key = key
+
     async def handle(self, reader, writer):
         # get salt
         salt = await utils.get_content(reader, True)
-        Encrypt = aes_gcm(KEY, salt)
-        Decrypt = aes_gcm(KEY, salt)
+        Encrypt = aes_gcm(self.key, salt)
+        Decrypt = aes_gcm(self.key, salt)
 
         # get target addr, port
         data_to_send = await utils.get_content(reader, True)
@@ -127,7 +130,7 @@ class Server:
         logging.debug('stop relay')
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='holosocket server')
     parser.add_argument('-c', '--config', help='config file')
     parser.add_argument('-4', '--ipv4', action='store_true', help='ipv4 only')
@@ -146,7 +149,7 @@ if __name__ == '__main__':
     PORT = config['local_port']
     KEY = config['password']
 
-    server = Server()
+    server = Server(KEY)
 
     loop = asyncio.get_event_loop()
     relay_loop = asyncio.get_event_loop()
@@ -162,3 +165,7 @@ if __name__ == '__main__':
     server.close()
     loop.run_until_complete(server.wait_closed())
     loop.close()
+
+
+if __name__ == '__main__':
+    main()
