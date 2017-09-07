@@ -3,10 +3,15 @@
 import argparse
 import asyncio
 import functools
-import json
 import logging
 import socket
 import struct
+import yaml
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 
 import utils
 from encrypt import aes_gcm
@@ -202,14 +207,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.config:
         with open(args.config, 'r') as f:
-            config = json.load(f)
+            config = yaml.load(f, Loader=Loader)
 
     SERVER = config['server']
     SERVER_PORT = config['server_port']
     LOCAL = config['local']
     PORT = config['local_port']
     KEY = config['password']
-    AUTH = config['auth_addr']
 
     server = Server()
 

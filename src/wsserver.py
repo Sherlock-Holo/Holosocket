@@ -2,9 +2,14 @@
 import argparse
 import asyncio
 import functools
-import json
 import logging
 import struct
+import yaml
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 
 import utils
 from encrypt import aes_gcm
@@ -125,16 +130,21 @@ class Server:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='holosocket server')
     parser.add_argument('-c', '--config', help='config file')
+    parser.add_argument('-4', '--ipv4', action='store_true', help='ipv4 only')
     args = parser.parse_args()
     if args.config:
         with open(args.config, 'r') as f:
-            config = json.load(f)
+            config = yaml.load(f, Loader=Loader)
 
-    SERVER = config['server']
+    SERVER = [config['server']]
+    if not args.ipv4:
+        if 'server_v6' in config:
+            SERVER_V6 = config['server_v6']
+            SERVER.append(SERVER_V6)
+
     SERVER_PORT = config['server_port']
     PORT = config['local_port']
     KEY = config['password']
-    AUTH = config['auth_addr']
 
     server = Server()
 
