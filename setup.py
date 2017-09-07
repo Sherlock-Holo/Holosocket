@@ -6,8 +6,8 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'wslocal = src.wslocal:main',
-            'wsserver = src.wsserver:main'
+            'wslocal = holosocket.wslocal:main',
+            'wsserver = holosocket.wsserver:main'
         ]
     }
 )
