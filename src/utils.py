@@ -1,11 +1,10 @@
 import base64
 import hashlib
-import logging
 import secrets
 import struct
 
 
-def gen_data_len(mask_flag, data):
+def _gen_data_len(mask_flag, data):
     data_len = len(data)
     if mask_flag:
         if data_len <= 125:
@@ -39,6 +38,7 @@ def gen_data_len(mask_flag, data):
             return prefix, data_len
 
 
+# deprecated
 def gen_request(addr, port):
     Sec_WebSocket_Key = secrets.token_urlsafe(16)
     Sec_WebSocket_Key = base64.b64encode(Sec_WebSocket_Key.encode())
@@ -60,6 +60,7 @@ def gen_request(addr, port):
     return b''.join(data), Sec_WebSocket_Key
 
 
+# deprecated
 def certificate_key(Sec_WebSocket_Key, Sec_WebSocket_Accept):
     guid = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
     Sec_WebSocket_Key += guid
@@ -72,6 +73,7 @@ def certificate_key(Sec_WebSocket_Key, Sec_WebSocket_Accept):
         return False
 
 
+# deprecated
 def gen_response(Sec_WebSocket_Key):
     guid = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
     Sec_WebSocket_Key += guid
@@ -104,7 +106,7 @@ def mask(data, mask_key=None):
 
 def gen_local_frame(content):
     data = [struct.pack('>B', 1 << 7 | 2)]
-    prefix, content_len = gen_data_len(True, content)
+    prefix, content_len = _gen_data_len(True, content)
     if content_len == 0:
         data.append(prefix)
     else:
@@ -119,7 +121,7 @@ def gen_local_frame(content):
 
 def gen_server_frame(content):
     data = [struct.pack('>B', 1 << 7 | 2)]
-    prefix, content_len = gen_data_len(False, content)
+    prefix, content_len = _gen_data_len(False, content)
     if content_len == 0:
         data.append(prefix)
     else:
@@ -142,6 +144,7 @@ def gen_close_frame(mask):
     return data
 
 
+# deprecated
 def certificate(header, addr, port):
     if header['Host'] != b':'.join([addr.encode(), str(port).encode()]):
         return False
@@ -156,6 +159,7 @@ def certificate(header, addr, port):
         return True
 
 
+# deprecated
 def not_found():
     data = [
         b'HTTP/1.1 404 Not Found\r\n',
