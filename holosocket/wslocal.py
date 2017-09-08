@@ -68,7 +68,7 @@ class Server:
         # ipv4
         if atyp == 1:
             _addr = await reader.read(4)
-            addr = socket.inet_ntoa(_addr)
+            addr = socket.inet_ntoa(_addr).encode()
 
         # domain name
         elif atyp == 3:
@@ -78,7 +78,7 @@ class Server:
         # ipv6
         elif atyp == 4:
             _addr = await reader.read(16)
-            addr = socket.inet_ntop(socket.AF_INET6, _addr)
+            addr = socket.inet_ntop(socket.AF_INET6, _addr).encode()
 
         port = await reader.read(2)
 
