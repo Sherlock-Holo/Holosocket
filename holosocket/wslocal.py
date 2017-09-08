@@ -21,7 +21,7 @@ except ModuleNotFoundError:  # develop mode
     from encrypt import aes_gcm
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='{asctime} {levelname} {message}',
     datefmt='%Y-%m-%d %H:%M:%S',
     style='{')
