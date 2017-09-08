@@ -11,8 +11,12 @@ try:
 except ImportError:
     from yaml import Loader
 
-from . import utils
-from .encrypt import aes_gcm
+try:
+    from . import utils
+    from .encrypt import aes_gcm
+except ModuleNotFoundError:  # develop mode
+    import utils
+    from encrypt import aes_gcm
 
 logging.basicConfig(
     level=logging.DEBUG,
