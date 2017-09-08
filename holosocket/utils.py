@@ -1,7 +1,15 @@
 import base64
 import hashlib
-import secrets
 import struct
+
+try:
+    import secrets
+except ImportError:
+    # Python 3.5 compatible
+    import os
+    class secrets:
+        def token_bytes(self, n):
+            return os.urandom(n)
 
 
 def _gen_data_len(mask_flag, data):
