@@ -39,7 +39,7 @@ def _gen_data_len(mask_flag, data):
 
 
 # deprecated
-def gen_request(addr, port):
+"""def gen_request(addr, port):
     Sec_WebSocket_Key = secrets.token_urlsafe(16)
     Sec_WebSocket_Key = base64.b64encode(Sec_WebSocket_Key.encode())
     data = [
@@ -89,7 +89,7 @@ def gen_response(Sec_WebSocket_Key):
         b'\r\n\r\n'
     ]
 
-    return b''.join(data)
+    return b''.join(data)"""
 
 
 def mask(data, mask_key=None):
