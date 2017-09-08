@@ -86,15 +86,7 @@ class Server:
         data_to_send = []
         addr_len = len(addr)
         data_to_send.append(struct.pack('>B', addr_len))
-        if atyp == 1:
-            data_to_send.append(socket.inet_aton(addr))
-
-        elif atyp == 3:
-            data_to_send.append(addr)
-
-        elif atyp == 4:
-            data_to_send.append(socket.inet_pton(socket.AF_INET6, addr))
-
+        data_to_send.append(addr)
         data_to_send.append(port)
         data_to_send = b''.join(data_to_send)
 
