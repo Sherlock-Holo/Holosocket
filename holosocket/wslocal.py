@@ -16,7 +16,7 @@ except ImportError:
 try:
     from . import utils
     from .encrypt import aes_gcm
-except ModuleNotFoundError:  # develop mode
+except (ModuleNotFoundError, ImportError):  # develop mode
     import utils
     from encrypt import aes_gcm
 
