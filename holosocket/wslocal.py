@@ -226,6 +226,13 @@ def main():
 
     server = Server(SERVER, SERVER_PORT, KEY)
 
+    try:
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        logging.info('uvloop mode')
+    except ImportError:
+        logging.info('pure asyncio mode')
+
     loop = asyncio.get_event_loop()
     coro = asyncio.start_server(server.handle, LOCAL, PORT, loop=loop)
     server = loop.run_until_complete(coro)
