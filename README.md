@@ -36,8 +36,8 @@ optional arguments:
 `config.yaml`
 
 > server: 127.0.0.2
-server_v6: "::"
-server_port: 1088
-local: 127.0.0.2
-local_port: 1089
-password: test
+> server_v6: "::"
+> server_port: 1088
+> local: 127.0.0.2
+> local_port: 1089
+> password: test
