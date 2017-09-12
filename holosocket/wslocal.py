@@ -20,12 +20,6 @@ except (ModuleNotFoundError, ImportError):  # develop mode
     import utils
     from encrypt import aes_gcm
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='{asctime} {levelname} {message}',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    style='{')
-
 
 class Server:
     def __init__(self, server, server_port, key):
@@ -112,13 +106,26 @@ class Server:
         Decrypt = aes_gcm(self.key, salt)
 
         # send salt
-        r_writer.write(utils.gen_local_frame(salt))
-        await r_writer.drain()
+        try:
+            r_writer.write(utils.gen_local_frame(salt))
+            await r_writer.drain()
 
-        data_to_send, tag = Encrypt.encrypt(data_to_send)
-        content = utils.gen_local_frame(data_to_send + tag)
-        r_writer.write(content)
-        await r_writer.drain()
+            data_to_send, tag = Encrypt.encrypt(data_to_send)
+            content = utils.gen_local_frame(data_to_send + tag)
+            r_writer.write(content)
+            await r_writer.drain()
+
+        except OSError as e:
+            logging.error(e)
+            return None
+
+        except ConnectionResetError as e:
+            logging.error(e)
+            return None
+
+        except BrokenPipeError as e:
+            logging.error(e)
+            return None
 
         logging.debug('start relay')
 
@@ -205,10 +212,24 @@ class Server:
 def main():
     parser = argparse.ArgumentParser(description='holosocket local')
     parser.add_argument('-c', '--config', help='config file')
+    parser.add_argument('--debug', action='store_true', help='debug mode')
+
     args = parser.parse_args()
+
     if args.config:
         with open(args.config, 'r') as f:
             config = yaml.load(f, Loader=Loader)
+
+    if args.debug:
+        MODE = logging.DEBUG
+    else:
+        MODE = logging.INFO
+
+    logging.basicConfig(
+        level=MODE,
+        format='{asctime} {levelname} {message}',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        style='{')
 
     SERVER = config['server']
     SERVER_PORT = config['server_port']

@@ -18,32 +18,39 @@ except (ModuleNotFoundError, ImportError):  # develop mode
     import utils
     from encrypt import aes_gcm
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='{asctime} {levelname} {message}',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    style='{')
-
 
 class Server:
     def __init__(self, key):
         self.key = key
 
     async def handle(self, reader, writer):
-        # get salt
-        salt = await utils.get_content(reader, True)
-        Encrypt = aes_gcm(self.key, salt)
-        Decrypt = aes_gcm(self.key, salt)
+        try:
+            # get salt
+            salt = await utils.get_content(reader, True)
+            Encrypt = aes_gcm(self.key, salt)
+            Decrypt = aes_gcm(self.key, salt)
 
-        # get target addr, port
-        data_to_send = await utils.get_content(reader, True)
-        tag = data_to_send[-16:]
-        data = data_to_send[:-16]
-        content = Decrypt.decrypt(data, tag)
-        addr_len = content[0]
-        addr = content[1:1 + addr_len]
-        _port = content[-2:]
-        port = struct.unpack('>H', _port)[0]
+            # get target addr, port
+            data_to_send = await utils.get_content(reader, True)
+            tag = data_to_send[-16:]
+            data = data_to_send[:-16]
+            content = Decrypt.decrypt(data, tag)
+            addr_len = content[0]
+            addr = content[1:1 + addr_len]
+            _port = content[-2:]
+            port = struct.unpack('>H', _port)[0]
+
+        except OSError as e:
+            logging.error(e)
+            return None
+
+        except ConnectionResetError as e:
+            logging.error(e)
+            return None
+
+        except BrokenPipeError as e:
+            logging.error(e)
+            return None
 
         # connect to target
         try:
@@ -96,6 +103,7 @@ class Server:
             except ConnectionResetError as e:
                 logging.error(e)
                 break
+
             except BrokenPipeError as e:
                 logging.error(e)
                 break
@@ -138,10 +146,24 @@ def main():
     parser = argparse.ArgumentParser(description='holosocket server')
     parser.add_argument('-c', '--config', help='config file')
     parser.add_argument('-4', '--ipv4', action='store_true', help='ipv4 only')
+    parser.add_argument('--debug', action='store_true', help='debug mode')
+
     args = parser.parse_args()
+
     if args.config:
         with open(args.config, 'r') as f:
             config = yaml.load(f, Loader=Loader)
+
+    if args.debug:
+        MODE = logging.DEBUG
+    else:
+        MODE = logging.INFO
+
+    logging.basicConfig(
+        level=MODE,
+        format='{asctime} {levelname} {message}',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        style='{')
 
     SERVER = [config['server']]
     if not args.ipv4:
