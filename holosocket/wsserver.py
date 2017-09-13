@@ -30,6 +30,7 @@ class Server:
 
             if not len(salt) == 16:
                 logging.warn('recv error salt')
+                asyncio.sleep(90)
                 writer.close()
                 return None
 
