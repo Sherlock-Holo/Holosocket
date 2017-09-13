@@ -29,7 +29,7 @@ setup(
     classifiers=[
         'Environment :: Console',
         'License :: OSI Approved :: MPL License',
-        #'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6'
     ]
 )
