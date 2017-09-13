@@ -168,12 +168,12 @@ def certificate(header, addr, port):
 
 
 # deprecated
-def not_found():
+"""def not_found():
     data = [
         b'HTTP/1.1 404 Not Found\r\n',
         b'Connection: Closed\r\n\r\n'
         ]
-    return b''.join(data)
+    return b''.join(data)"""
 
 
 # resolve websocket frame
