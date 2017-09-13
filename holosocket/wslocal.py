@@ -77,18 +77,19 @@ class Server:
         port = await reader.read(2)
 
         # send target addr and port to server
-        data_to_send = []
-        addr_len = len(addr)
-        data_to_send.append(struct.pack('>B', addr_len))
-        data_to_send.append(addr)
-        data_to_send.append(port)
+        data_to_send = [
+            struct.pack('>B', len(addr)),
+            addr,
+            port
+        ]
         data_to_send = b''.join(data_to_send)
 
         # success response
-        data = []
-        data.append(b'\x05\x00\x00\x01')
-        data.append(socket.inet_aton('0.0.0.0'))
-        data.append(struct.pack('>H', 0))
+        data = [
+            b'\x05\x00\x00\x01',
+            socket.inet_aton('0.0.0.0'),
+            struct.pack('>H', 0)
+        ]
         writer.write(b''.join(data))
         await writer.drain()
 
