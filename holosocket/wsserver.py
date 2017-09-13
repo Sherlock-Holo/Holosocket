@@ -27,6 +27,12 @@ class Server:
         try:
             # get salt
             salt = await utils.get_content(reader, True)
+
+            if not len(salt) == 16:
+                logging.warn('recv error salt')
+                writer.close()
+                return None
+
             Encrypt = aes_gcm(self.key, salt)
             Decrypt = aes_gcm(self.key, salt)
 
