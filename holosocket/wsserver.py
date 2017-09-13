@@ -29,7 +29,8 @@ class Server:
             salt = await utils.get_content(reader, True)
 
             if not len(salt) == 16:
-                logging.warn('recv error salt')
+                logging.warn(
+                    'recv error salt {} bytes: {}'.format(len(salt), salt))
                 asyncio.sleep(90)
                 writer.close()
                 return None
