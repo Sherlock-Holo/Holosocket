@@ -177,14 +177,14 @@ def certificate(header, addr, port):
 
 
 # resolve websocket frame
-async def get_content(reader, is_server, mask_key=None):
+async def get_content(reader, run_on_server, mask_key=None):
     data = await reader.read(2)  # (FIN, RSV * 3, optcode)
 
     if not data:
         return None
 
     FRO, prefix = data
-    if is_server:
+    if run_on_server:
         prefix = prefix & 0x7f
 
     if prefix <= 125:
@@ -198,7 +198,7 @@ async def get_content(reader, is_server, mask_key=None):
         _payload_len = await reader.read(8)
         payload_len = struct.unpack('>Q', _payload_len)[0]
 
-    if is_server:
+    if run_on_server:
         mask_key = await reader.read(4)
 
     content_len = 0
@@ -211,7 +211,7 @@ async def get_content(reader, is_server, mask_key=None):
         if content_len == payload_len:
             break
 
-    if is_server:
+    if run_on_server:
         payload = b''.join(content)
         content = mask(payload, mask_key)[0]
         return content
