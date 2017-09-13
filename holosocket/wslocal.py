@@ -50,10 +50,11 @@ class Server:
         ver, cmd, rsv, atyp = data
         # cmd not support
         if cmd != 1:
-            data = []
-            data.append(b'\x05\x07\x00\x01')
-            data.append(socket.inet_aton('0.0.0.0'))
-            data.append(struct.pack('>H', 0))
+            data = (
+                b'\x05\x07\x00\x01',
+                socket.inet_aton('0.0.0.0'),
+                struct.pack('>H', 0)
+            )
             writer.write(b''.join(data))
             writer.close()
             logging.error('cmd not support')
