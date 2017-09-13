@@ -99,6 +99,7 @@ class Server:
 
         except OSError as e:
             logging.error(e)
+            writer.close()
             return None
 
         Encrypt = aes_gcm(self.key)

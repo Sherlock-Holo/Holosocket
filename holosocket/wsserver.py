@@ -42,14 +42,17 @@ class Server:
 
         except OSError as e:
             logging.error(e)
+            writer.close()
             return None
 
         except ConnectionResetError as e:
             logging.error(e)
+            writer.close()
             return None
 
         except BrokenPipeError as e:
             logging.error(e)
+            writer.close()
             return None
 
         # connect to target
@@ -58,6 +61,7 @@ class Server:
 
         except OSError as e:
             logging.error(e)
+            writer.close()
             return None
 
         logging.debug('start relay')
