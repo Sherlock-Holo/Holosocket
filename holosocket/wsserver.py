@@ -41,7 +41,14 @@ class Server:
             data_to_send = await utils.get_content(reader, True)
             tag = data_to_send[-16:]
             data = data_to_send[:-16]
-            content = Decrypt.decrypt(data, tag)
+            try:
+                content = Decrypt.decrypt(data, tag)
+            except ValueError:
+                logging.warn('detect attack')
+                asyncio.sleep(90)
+                writer.close()
+                return None
+
             addr_len = content[0]
             addr = content[1:1 + addr_len]
             _port = content[-2:]
@@ -166,12 +173,12 @@ def main():
             config = yaml.load(f, Loader=Loader)
 
     if args.debug:
-        MODE = logging.DEBUG
+        LOGGING_MODE = logging.DEBUG
     else:
-        MODE = logging.INFO
+        LOGGING_MODE = logging.INFO
 
     logging.basicConfig(
-        level=MODE,
+        level=LOGGING_MODE,
         format='{asctime} {levelname} {message}',
         datefmt='%Y-%m-%d %H:%M:%S',
         style='{')
