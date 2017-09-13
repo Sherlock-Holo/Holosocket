@@ -77,19 +77,19 @@ class Server:
         port = await reader.read(2)
 
         # send target addr and port to server
-        data_to_send = [
+        data_to_send = (
             struct.pack('>B', len(addr)),
             addr,
             port
-        ]
+        )
         data_to_send = b''.join(data_to_send)
 
         # success response
-        data = [
+        data = (
             b'\x05\x00\x00\x01',
             socket.inet_aton('0.0.0.0'),
             struct.pack('>H', 0)
-        ]
+        )
         writer.write(b''.join(data))
         await writer.drain()
 
@@ -189,8 +189,8 @@ class Server:
                     break
 
                 # send data
-                tag = data[-16:]
-                content = data[:-16]
+                content, tag = data[:-16], data[-16:]
+
                 try:
                     data = cipher.decrypt(content, tag)
                 except ValueError:
@@ -226,12 +226,12 @@ def main():
             config = yaml.load(f, Loader=Loader)
 
     if args.debug:
-        MODE = logging.DEBUG
+        LOGGING_MODE = logging.DEBUG
     else:
-        MODE = logging.INFO
+        LOGGING_MODE = logging.INFO
 
     logging.basicConfig(
-        level=MODE,
+        level=LOGGING_MODE,
         format='{asctime} {levelname} {message}',
         datefmt='%Y-%m-%d %H:%M:%S',
         style='{')
