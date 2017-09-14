@@ -192,20 +192,35 @@ async def get_content(reader, run_on_server, mask_key=None):
 
     elif prefix == 126:
         _payload_len = await reader.read(2)
+        # conn close
+        if not _payload_len:
+            return None
+
         payload_len = struct.unpack('>H', _payload_len)[0]
 
     elif prefix == 127:
         _payload_len = await reader.read(8)
+        # conn close
+        if not _payload_len:
+            return None
+
         payload_len = struct.unpack('>Q', _payload_len)[0]
 
     if run_on_server:
         mask_key = await reader.read(4)
+        # conn close
+        if not mask_key:
+            return None
 
     content_len = 0
     content = []
 
     while True:
         data = await reader.read(payload_len - content_len)
+        # conn close
+        if not data:
+            return None
+
         content.append(data)
         content_len += len(data)
         if content_len == payload_len:

@@ -28,6 +28,11 @@ class Server:
             # get salt
             salt = await utils.get_content(reader, True)
 
+            if not salt:
+                logging.warn('conn close quickly, please notice it!')
+                writer.close()
+                return None
+
             if not len(salt) == 16:
                 logging.warn(
                     'recv error salt {} bytes: {}'.format(len(salt), salt))
@@ -40,6 +45,11 @@ class Server:
 
             # get target addr, port
             data_to_send = await utils.get_content(reader, True)
+            # conn close
+            if not data_to_send:
+                writer.close()
+                return None
+
             data, tag = data_to_send[:-16], data_to_send[-16:]
             try:
                 content = Decrypt.decrypt(data, tag)
