@@ -3,41 +3,8 @@ from Cryptodome.Cipher import AES
 from Cryptodome.Hash import SHA256
 from Cryptodome.Random import get_random_bytes
 
-
 Cipher_Tag = {'aes-256-gcm': 16}
-Nonce_Len = 8    # fuck you 12 bytes
-
-
-class aes_cfb:
-    def __init__(self, key, iv=None):
-        '''Create a new AES-CFB cipher.
-        iv: a 16 bytes length byte string, if not provided a random iv is used
-        key: Your password like: passw0rd'''
-
-        self.key = SHA256.new(key.encode()).digest()
-        if not iv:
-            self.iv = get_random_bytes(AES.block_size)
-
-        else:
-            if len(iv) != 16:
-                error_msg = 'iv length should be 16, not {}'
-                raise ValueError(error_msg.format(len(iv)))
-
-            elif type(iv) != bytes:
-                raise TypeError('iv should be bytes')
-
-            else:
-                self.iv = iv
-
-        self.cipher = AES.new(self.key, AES.MODE_CFB, self.iv)
-
-    def encrypt(self, data):
-        '''Return cipher'''
-        return self.cipher.encrypt(data)
-
-    def decrypt(self, data):
-        '''Return plain text'''
-        return self.cipher.decrypt(data)
+Nonce_Len = 8  # fuck you 12 bytes
 
 
 class aes_gcm:
@@ -58,7 +25,8 @@ class aes_gcm:
 
             else:
                 self.salt = salt
-        self.key = SHA256.new(self.raw_key + self.salt).digest()    # generate a 256 bytes key
+        self.key = SHA256.new(self.raw_key +
+                              self.salt).digest()  # generate a 256 bytes key
         self.nonce = 0
 
     def _new(self):
@@ -79,14 +47,6 @@ class aes_gcm:
 
 
 if __name__ == '__main__':
-    # AES-CFB
-    print('AES-256-CFB')
-    en = aes_cfb('test')
-    iv = en.iv
-    cipher = en.encrypt(b'holo')
-    de = aes_cfb('test', iv)
-    print(de.decrypt(cipher))
-
     # AES-GCM
     print('AES-256-GCM')
     gen = aes_gcm('test')
