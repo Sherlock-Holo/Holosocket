@@ -68,7 +68,7 @@ class Server:
         # domain name
         elif atyp == 3:
             addr_len = await reader.read(1)
-            addr = await reader.read(ord(addr_len))
+            addr = await reader.read(struct.unpack('>B', addr_len)[0])
 
         # ipv6
         elif atyp == 4:
