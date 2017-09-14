@@ -40,8 +40,7 @@ class Server:
 
             # get target addr, port
             data_to_send = await utils.get_content(reader, True)
-            tag = data_to_send[-16:]
-            data = data_to_send[:-16]
+            data, tag = data_to_send[:-16], data_to_send[-16:]
             try:
                 content = Decrypt.decrypt(data, tag)
             except ValueError:
@@ -103,8 +102,7 @@ class Server:
                     break
 
                 # send data
-                tag = data[-16:]
-                content = data[:-16]
+                content, tag = data[:-16], data[-16:]
                 try:
                     data = cipher.decrypt(content, tag)
                 except ValueError:
