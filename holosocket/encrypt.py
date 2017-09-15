@@ -59,7 +59,6 @@ def test():
     print('AES-256-GCM')
     gen = aes_gcm('test')
     salt = gen.salt
-    nonce = gen.nonce
     gcipher = gen.encrypt(b'holo')
     gde = aes_gcm('test', salt)
     print(gde.decrypt(*gcipher))
