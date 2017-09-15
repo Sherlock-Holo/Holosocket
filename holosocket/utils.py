@@ -4,11 +4,11 @@ try:
     import secrets
 except ImportError:
     # Python 3.5 compatible
-    import os
+    from os import urandom
 
     class Secrets:
         def token_bytes(self, n):
-            return os.urandom(n)
+            return urandom(n)
 
     secrets = Secrets()
 
