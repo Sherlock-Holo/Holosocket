@@ -30,13 +30,14 @@ class Server:
 
             if not salt:
                 logging.warn('conn close quickly, please notice it!')
+                await asyncio.sleep(90)
                 writer.close()
                 return None
 
             if not len(salt) == 16:
                 logging.warn(
                     'recv error salt {} bytes: {}'.format(len(salt), salt))
-                asyncio.sleep(90)
+                await asyncio.sleep(90)
                 writer.close()
                 return None
 
