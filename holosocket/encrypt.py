@@ -36,13 +36,20 @@ class aes_gcm:
         self.nonce += 1
 
     def encrypt(self, data):
+        '''Encrypt data return cipher
+
+        data: raw data'''
         self._new()
-        '''Return (cpiher, MAC)'''
+        #Return (cpiher, MAC)
         return self.cipher.encrypt_and_digest(data)
 
     def decrypt(self, data, mac):
+        '''Decrypt data
+
+        data: cipher
+        mac: gmac'''
         self._new()
-        '''Verify MAC, if matching, will return plain text or raise ValueError'''
+        #Verify MAC, if matching, will return plain text or raise ValueError
         plain = self.cipher.decrypt_and_verify(data, mac)
         return plain
 
