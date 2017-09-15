@@ -4,7 +4,7 @@ from Cryptodome.Hash import SHA256
 from Cryptodome.Random import get_random_bytes
 
 #Cipher_Tag = {'aes-256-gcm': 16}
-Nonce_Len = 8  # fuck you 12 bytes
+#Nonce_Len = 8  # fuck you 12 bytes
 
 
 class aes_gcm:
@@ -25,6 +25,7 @@ class aes_gcm:
 
             else:
                 self.salt = salt
+
         self.key = SHA256.new(self.raw_key +
                               self.salt).digest()  # generate a 256 bytes key
         self.nonce = 0
@@ -46,7 +47,7 @@ class aes_gcm:
         return plain
 
 
-if __name__ == '__main__':
+def test():
     # AES-GCM
     print('AES-256-GCM')
     gen = aes_gcm('test')
@@ -55,3 +56,7 @@ if __name__ == '__main__':
     gcipher = gen.encrypt(b'holo')
     gde = aes_gcm('test', salt)
     print(gde.decrypt(*gcipher))
+
+
+if __name__ == '__main__':
+    test()
