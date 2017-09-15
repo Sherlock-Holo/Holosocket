@@ -1,5 +1,3 @@
-import base64
-import hashlib
 import struct
 
 try:
@@ -7,9 +5,12 @@ try:
 except ImportError:
     # Python 3.5 compatible
     import os
-    class secrets:
+
+    class Secrets:
         def token_bytes(self, n):
             return os.urandom(n)
+
+    secrets = Secrets()
 
 
 def _gen_data_len(mask_flag, data):
