@@ -28,7 +28,13 @@ class Server:
         self.key = key
 
     async def handle(self, reader, writer):
-        request = await reader.read(2)
+        try:
+            request = await reader.readexactly(2)
+        except asyncio.IncompleteReadError as e:
+            logging.error('read request error')
+            writer.close()
+            return None
+
         # socks version not support
         if request[0] != 5:
             writer.close()
@@ -36,7 +42,13 @@ class Server:
             return None
         else:
             nmethods = request[1]
-            methods = await reader.read(nmethods)
+            try:
+                methods = await reader.readexactly(nmethods)
+            except asyncio.IncompleteReadError:
+                logging.error('read methods error')
+                writer.close()
+                return None
+
             if 0 in methods:
                 writer.write(b'\x05\x00')
                 await writer.drain()
@@ -46,7 +58,13 @@ class Server:
                 writer.close()
                 return None
 
-        data = await reader.read(4)
+        try:
+            data = await reader.readexactly(4)
+        except asyncio.IncompleteReadError:
+            logging.error('read (ver, cmd, rsv, atyp) error')
+            writer.close()
+            return None
+
         ver, cmd, rsv, atyp = data
         # cmd not support
         if cmd != 1:
@@ -62,20 +80,43 @@ class Server:
 
         # ipv4
         if atyp == 1:
-            _addr = await reader.read(4)
+            try:
+                _addr = await reader.readexactly(4)
+            except asyncio.IncompleteReadError:
+                logging.error('read ipv4 addr error')
+                writer.close()
+                return None
+
             addr = socket.inet_ntoa(_addr).encode()
 
         # domain name
         elif atyp == 3:
-            addr_len = await reader.read(1)
-            addr = await reader.read(struct.unpack('>B', addr_len)[0])
+            try:
+                addr_len = await reader.readexactly(1)
+                addr = await reader.readexactly(
+                    struct.unpack('>B', addr_len)[0])
+            except asyncio.IncompleteReadError:
+                logging.error('read domain name error')
+                writer.close()
+                return None
 
         # ipv6
         elif atyp == 4:
-            _addr = await reader.read(16)
+            try:
+                _addr = await reader.readexactly(16)
+            except asyncio.IncompleteReadError:
+                logging.error('read ipv6 addr error')
+                writer.close()
+                return None
+
             addr = socket.inet_ntop(socket.AF_INET6, _addr).encode()
 
-        port = await reader.read(2)
+        try:
+            port = await reader.readexactly(2)
+        except asyncio.IncompleteReadError:
+            logging.error('read port error')
+            writer.close()
+            return None
 
         # send target addr and port to server
         data_to_send = (
