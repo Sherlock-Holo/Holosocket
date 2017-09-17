@@ -5,6 +5,7 @@ a simple websocket proxy
 * python >= 3.5 (for `async` `await`)
 * pycryptodomex (AES-GCM encrypt)
 * PyYAML (parse yaml config file)
+* uvloop (optional: better performance)
 
 ## Usage
 ```
@@ -37,7 +38,6 @@ optional arguments:
 
 > ```
 > server: 127.0.0.2
-> server_v6: "::"
 > server_port: 1088
 > local: 127.0.0.2
 > local_port: 1089
