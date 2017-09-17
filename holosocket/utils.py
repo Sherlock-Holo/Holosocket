@@ -1,4 +1,5 @@
 import struct
+from asyncio import IncompleteReadError
 
 try:
     import secrets
@@ -179,9 +180,10 @@ def certificate(header, addr, port):
 
 # resolve websocket frame
 async def get_content(reader, run_on_server, mask_key=None):
-    data = await reader.read(2)  # (FIN, RSV * 3, optcode)
+    try:
+        data = await reader.readexactly(2)  # (FIN, RSV * 3, optcode)
 
-    if not data:
+    except IncompleteReadError:
         return None
 
     FRO, prefix = data
@@ -192,25 +194,28 @@ async def get_content(reader, run_on_server, mask_key=None):
         payload_len = prefix
 
     elif prefix == 126:
-        _payload_len = await reader.read(2)
+        try:
+            _payload_len = await reader.readexactly(2)
         # conn close
-        if not _payload_len:
+        except IncompleteReadError:
             return None
 
         payload_len = struct.unpack('>H', _payload_len)[0]
 
     elif prefix == 127:
-        _payload_len = await reader.read(8)
+        try:
+            _payload_len = await reader.readexactly(8)
         # conn close
-        if not _payload_len:
+        except IncompleteReadError:
             return None
 
         payload_len = struct.unpack('>Q', _payload_len)[0]
 
     if run_on_server:
-        mask_key = await reader.read(4)
+        try:
+            mask_key = await reader.readexactly(4)
         # conn close
-        if not mask_key:
+        except IncompleteReadError:
             return None
 
     content_len = 0
