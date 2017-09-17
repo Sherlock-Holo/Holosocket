@@ -193,11 +193,11 @@ def main():
         datefmt='%Y-%m-%d %H:%M:%S',
         style='{')
 
-    SERVER = [config['server']]
-    if not args.ipv4:
-        if 'server_v6' in config:
-            SERVER_V6 = config['server_v6']
-            SERVER.append(SERVER_V6)
+    if args.ipv4:
+        SERVER = config['server']
+
+    else:
+        SERVER = (config['server'], '::')
 
     SERVER_PORT = config['server_port']
     KEY = config['password']
