@@ -6,6 +6,8 @@ a simple websocket proxy
 * pycryptodomex (AES-GCM encrypt)
 * PyYAML (parse yaml config file)
 * uvloop (optional: better performance)
+* aiodns
+* cachetools (optional: cache DNS resolve result)
 
 ## Usage
 ```
