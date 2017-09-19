@@ -1,3 +1,6 @@
+import aiodns
+import logging
+import socket
 import struct
 from asyncio import IncompleteReadError
 
@@ -12,6 +15,35 @@ except ImportError:
             return urandom(n)
 
     secrets = Secrets()
+
+
+class Resolver:
+    def __init__(self, maxsize=128, nameservers=None):
+        try:
+            from cachetools import LRUCache
+            self.cache = LRUCache(maxsize=maxsize)
+            logging.info('Use LRUCache')
+        except ImportError:
+            self.resolve = self._resolve
+        self.resolver = aiodns.DNSResolver(nameservers=nameservers)
+
+    async def _resolve(self, host):
+        try:
+            result = await self.resolver.gethostbyname(host, socket.AF_INET6)
+            if not result.addresses:
+                raise aiodns.error.DNSError
+        except aiodns.error.DNSError:
+            result = await self.resolver.gethostbyname(host, socket.AF_INET)
+
+        return result.addresses[0]
+
+    async def resolve(self, host):
+        try:
+            return self.cache[host]
+        except KeyError:
+            ip_addr = await self._resolve(host)
+            self.cache[host] = ip_addr
+            return ip_addr
 
 
 def _gen_data_len(mask_flag, data):
@@ -155,7 +187,7 @@ def gen_close_frame(mask):
 
 
 # deprecated
-def certificate(header, addr, port):
+"""def certificate(header, addr, port):
     if header['Host'] != b':'.join([addr.encode(), str(port).encode()]):
         return False
     elif header['Upgrade'] != b'websocket':
@@ -166,7 +198,7 @@ def certificate(header, addr, port):
         return False
 
     else:
-        return True
+        return True"""
 
 
 # deprecated
@@ -239,3 +271,17 @@ async def get_content(reader, run_on_server, mask_key=None):
 
     else:
         return b''.join(content)
+
+
+def is_ip_addr(addr):
+    try:
+        socket.inet_pton(socket.AF_INET6, addr.decode())
+        return True
+    except OSError:
+        pass
+
+    try:
+        socket.inet_aton(addr.decode())
+        return True
+    except OSError:
+        return False

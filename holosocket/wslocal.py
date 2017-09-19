@@ -284,8 +284,6 @@ def main():
     PORT = config['local_port']
     KEY = config['password']
 
-    server = Server(SERVER, SERVER_PORT, KEY)
-
     try:
         import uvloop
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -294,6 +292,7 @@ def main():
         logging.info('pure asyncio mode')
 
     loop = asyncio.get_event_loop()
+    server = Server(SERVER, SERVER_PORT, KEY)
     coro = asyncio.start_server(server.handle, LOCAL, PORT, loop=loop)
     server = loop.run_until_complete(coro)
 

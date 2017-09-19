@@ -14,14 +14,18 @@ except ImportError:
 try:
     from . import utils
     from .encrypt import aes_gcm
+    from .utils import Resolver
 except (ModuleNotFoundError, ImportError):  # develop mode
     import utils
     from encrypt import aes_gcm
+    from utils import Resolver
 
 
 class Server:
-    def __init__(self, key):
+    def __init__(self, key, nameservers=None):
         self.key = key
+        resolver = Resolver(nameservers=nameservers)
+        self.resolve = resolver.resolve
 
     async def handle(self, reader, writer):
         try:
@@ -62,6 +66,9 @@ class Server:
 
             addr_len = content[0]
             addr = content[1:1 + addr_len]
+            if not utils.is_ip_addr(addr):
+                addr = await self.resolve(addr)
+            logging.debug('addr is {}'.format(addr))
             _port = content[-2:]
             port = struct.unpack('>H', _port)[0]
 
@@ -202,8 +209,6 @@ def main():
     SERVER_PORT = config['server_port']
     KEY = config['password']
 
-    server = Server(KEY)
-
     try:
         import uvloop
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -212,6 +217,7 @@ def main():
         logging.info('pure asyncio mode')
 
     loop = asyncio.get_event_loop()
+    server = Server(KEY)
     coro = asyncio.start_server(server.handle, SERVER, SERVER_PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
