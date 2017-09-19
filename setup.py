@@ -15,9 +15,11 @@ setup(
         'setuptools',
         'pycryptodomex',
         'pyYAML'
+        'aiodns'
     ],
     extras_require={
-        'uvloop': []
+        'uvloop': [],
+        'cachetools': []
     },
     entry_points={
         'console_scripts': [
