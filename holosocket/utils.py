@@ -1,8 +1,10 @@
-import aiodns
 import logging
 import socket
 import struct
+from aiodns import DNSResolver
+from aiodns.error import DNSError
 from asyncio import IncompleteReadError
+
 
 try:
     import secrets
@@ -25,14 +27,14 @@ class Resolver:
             logging.info('Use LRUCache')
         except ImportError:
             self.resolve = self._resolve
-        self.resolver = aiodns.DNSResolver(nameservers=nameservers)
+        self.resolver = DNSResolver(nameservers=nameservers)
 
     async def _resolve(self, host):
         try:
             result = await self.resolver.gethostbyname(host, socket.AF_INET6)
             if not result.addresses:
-                raise aiodns.error.DNSError
-        except aiodns.error.DNSError:
+                raise DNSError
+        except DNSError:
             result = await self.resolver.gethostbyname(host, socket.AF_INET)
 
         return result.addresses[0]

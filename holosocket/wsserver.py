@@ -67,7 +67,12 @@ class Server:
             addr_len = content[0]
             addr = content[1:1 + addr_len]
             if not utils.is_ip_addr(addr):
-                addr = await self.resolve(addr)
+                try:
+                    addr = await self.resolve(addr)
+                except utils.DNSError as e:
+                    logging.error(e)
+                    writer.close()
+                    return None
             logging.debug('addr is {}'.format(addr))
             _port = content[-2:]
             port = struct.unpack('>H', _port)[0]
