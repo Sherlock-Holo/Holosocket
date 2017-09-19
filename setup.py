@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='Holosocket',
-    version='0.0',
+    version='0.1',
     author='Sherlock Holo',
     author_email='sherlockya@gmail.com',
     license='MPL',
