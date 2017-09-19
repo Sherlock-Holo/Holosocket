@@ -14,7 +14,7 @@ setup(
     install_requires=[
         'setuptools',
         'pycryptodomex',
-        'pyYAML'
+        'pyYAML',
         'aiodns'
     ],
     extras_require={
