@@ -17,17 +17,17 @@ class aes_gcm:
 
         self.raw_key = key.encode()
         if not salt:
-            self.salt = get_random_bytes(16)
+            self._salt = get_random_bytes(16)
         else:
             if len(salt) != 16:
                 error_msg = 'salt length should be 16, not {}'
                 raise ValueError(error_msg.format(len(salt)))
 
             else:
-                self.salt = salt
+                self._salt = salt
 
         self.key = SHA256.new(self.raw_key +
-                              self.salt).digest()  # generate a 256 bytes key
+                              self._salt).digest()  # generate a 256 bytes key
         self.nonce = 0
 
     def _new(self):
@@ -52,6 +52,10 @@ class aes_gcm:
         #Verify MAC, if matching, will return plain text or raise ValueError
         plain = self.cipher.decrypt_and_verify(data, mac)
         return plain
+
+    @property
+    def salt(self):
+        return self._salt
 
 
 def test():
