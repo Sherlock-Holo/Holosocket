@@ -213,6 +213,10 @@ def main():
 
     SERVER_PORT = config['server_port']
     KEY = config['password']
+    try:
+        DNS = config['dns']
+    except KeyError:
+        DNS = None
 
     try:
         import uvloop
@@ -222,7 +226,7 @@ def main():
         logging.info('pure asyncio mode')
 
     loop = asyncio.get_event_loop()
-    server = Server(KEY)
+    server = Server(KEY, nameservers=DNS)
     coro = asyncio.start_server(server.handle, SERVER, SERVER_PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
