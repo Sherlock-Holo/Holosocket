@@ -4,6 +4,7 @@ import struct
 from aiodns import DNSResolver
 from aiodns.error import DNSError
 from asyncio import IncompleteReadError
+from cachetools import LRUCache
 
 
 try:
@@ -21,12 +22,9 @@ except ImportError:
 
 class Resolver:
     def __init__(self, maxsize=128, nameservers=None):
-        try:
-            from cachetools import LRUCache
-            self.cache = LRUCache(maxsize=maxsize)
-            logging.info('Use LRUCache')
-        except ImportError:
-            self.resolve = self._resolve
+        self._cache = LRUCache(maxsize=maxsize)
+        self._hits = 0
+        self._miss = 0
         self.resolver = DNSResolver(nameservers=nameservers)
 
     async def _resolve(self, host):
@@ -41,11 +39,26 @@ class Resolver:
 
     async def resolve(self, host):
         try:
-            return self.cache[host]
+            self._hits += 1
+            return self._cache[host]
+
         except KeyError:
+            self._hits -= 1
+            self._miss += 1
             ip_addr = await self._resolve(host)
-            self.cache[host] = ip_addr
+            self._cache[host] = ip_addr
             return ip_addr
+
+        finally:
+            self._currsize = len(self._cache)
+
+    @property
+    def hits(self):
+        return self._hits
+
+    @property
+    def miss(self):
+        return self._miss
 
 
 def _gen_data_len(mask_flag, data):
