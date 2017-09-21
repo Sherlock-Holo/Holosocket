@@ -3,9 +3,6 @@ from Cryptodome.Cipher import AES
 from Cryptodome.Hash import SHA256
 from Cryptodome.Random import get_random_bytes
 
-#Cipher_Tag = {'aes-256-gcm': 16}
-#Nonce_Len = 8  # fuck you 12 bytes
-
 
 class aes_gcm:
     def __init__(self, key, salt=None):
@@ -40,7 +37,6 @@ class aes_gcm:
 
         data: raw data"""
         self._new()
-        #Return (cpiher, MAC)
         return self.cipher.encrypt_and_digest(data)
 
     def decrypt(self, data, mac):
@@ -49,7 +45,7 @@ class aes_gcm:
         data: cipher
         mac: gmac"""
         self._new()
-        #Verify MAC, if matching, will return plain text or raise ValueError
+        # Verify MAC, if matching, will return plain text or raise ValueError
         plain = self.cipher.decrypt_and_verify(data, mac)
         return plain
 
