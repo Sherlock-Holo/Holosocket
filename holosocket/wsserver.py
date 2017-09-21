@@ -23,11 +23,19 @@ except (ModuleNotFoundError, ImportError):  # develop mode
 
 class Server:
     def __init__(self, key, nameservers=None):
+        """Create a server.
+
+        key: encrypt key
+        nameservers: custom DNS server"""
         self.key = key
         resolver = Resolver(nameservers=nameservers)
         self.resolve = resolver.resolve
 
     async def handle(self, reader, writer):
+        """Connection handler.
+
+        reader: stream reader
+        writer: stream writer"""
         try:
             # get salt
             salt = await utils.get_content(reader, True)
@@ -116,6 +124,11 @@ class Server:
             functools.partial(self.close_transport, writer, r_writer))
 
     async def sock2remote(self, reader, writer, cipher):
+        """Relay handler (local -> remote).
+
+        reader: stream reader
+        writer: stream writer
+        cipher: decrypt handler"""
         while True:
             try:
                 data = await utils.get_content(reader, True)
@@ -149,6 +162,11 @@ class Server:
                 break
 
     async def remote2sock(self, reader, writer, cipher):
+        """Relay handler (remote -> server).
+
+        reader: stream reader
+        writer: stream writer
+        cipher: encrypt handler"""
         while True:
             try:
                 data = await reader.read(8192)
@@ -177,6 +195,11 @@ class Server:
                 break
 
     def close_transport(self, writer, r_writer, future):
+        """Close transport.
+
+        writer: sock stream writer
+        r_writer: remote stream writer
+        future: prepare for `functools.partial`"""
         writer.close()
         r_writer.close()
         logging.debug('stop relay')
