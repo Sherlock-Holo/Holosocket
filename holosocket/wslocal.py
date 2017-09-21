@@ -174,6 +174,11 @@ class Server:
             writer.close()
             return None
 
+        except TimeoutError as e:
+            logging.error(e)
+            writer.close()
+            return None
+
         logging.debug('start relay')
 
         s2r = asyncio.ensure_future(
@@ -221,6 +226,10 @@ class Server:
                 logging.error(e)
                 break
 
+            except TimeoutError as e:
+                logging.error(e)
+                break
+
     async def remote2sock(self, reader, writer, cipher):
         while True:
             try:
@@ -252,6 +261,10 @@ class Server:
                 break
 
             except BrokenPipeError as e:
+                logging.error(e)
+                break
+
+            except TimeoutError as e:
                 logging.error(e)
                 break
 

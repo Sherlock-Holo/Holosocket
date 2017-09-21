@@ -100,6 +100,11 @@ class Server:
             writer.close()
             return None
 
+        except TimeoutError as e:
+            logging.error(e)
+            writer.close()
+            return None
+
         # connect to target
         try:
             r_reader, r_writer = await asyncio.open_connection(addr, port)
@@ -161,6 +166,10 @@ class Server:
                 logging.error(e)
                 break
 
+            except TimeoutError as e:
+                logging.error(e)
+                break
+
     async def remote2sock(self, reader, writer, cipher):
         """Relay handler (remote -> server).
 
@@ -191,6 +200,10 @@ class Server:
                 break
 
             except BrokenPipeError as e:
+                logging.error(e)
+                break
+
+            except TimeoutError as e:
                 logging.error(e)
                 break
 
