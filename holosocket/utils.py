@@ -1,4 +1,3 @@
-import logging
 import socket
 import struct
 from aiodns import DNSResolver
@@ -22,12 +21,20 @@ except ImportError:
 
 class Resolver:
     def __init__(self, maxsize=128, nameservers=None):
+        """Create a async DNS resolver.
+
+        maxsize: the max size of cache result
+        nameservers: custom DNS resolve server"""
+
         self._cache = LRUCache(maxsize=maxsize)
         self._hits = 0
         self._miss = 0
         self.resolver = DNSResolver(nameservers=nameservers)
 
     async def _resolve(self, host):
+        """The real resolve DNS handler.
+
+        host: domain name"""
         try:
             result = await self.resolver.gethostbyname(host, socket.AF_INET6)
             if not result.addresses:
@@ -38,6 +45,9 @@ class Resolver:
         return result.addresses[0]
 
     async def resolve(self, host):
+        """Resolve handler.
+
+        host: domain name"""
         try:
             self._hits += 1
             return self._cache[host]
@@ -54,14 +64,20 @@ class Resolver:
 
     @property
     def hits(self):
+        """Return cache hits."""
         return self._hits
 
     @property
     def miss(self):
+        """Return cache miss."""
         return self._miss
 
 
 def _gen_data_len(mask_flag, data):
+    """Generate websocket format data-length.
+
+    mask_flag: mask flag
+    data: data will be send"""
     data_len = len(data)
     if mask_flag:
         if data_len <= 125:
@@ -150,6 +166,10 @@ def gen_response(Sec_WebSocket_Key):
 
 
 def mask(data, mask_key=None):
+    """Mask data.
+
+    data: raw data
+    mask_key: reuse mask key"""
     if not mask_key:
         mask_key = secrets.token_bytes(4)
     new = []
@@ -162,6 +182,9 @@ def mask(data, mask_key=None):
 
 
 def gen_local_frame(content):
+    """Generate a websocket local frame.
+
+    content: raw data"""
     data = [struct.pack('>B', 1 << 7 | 2)]
     prefix, content_len = _gen_data_len(True, content)
     if content_len == 0:
@@ -177,6 +200,9 @@ def gen_local_frame(content):
 
 
 def gen_server_frame(content):
+    """Generate a websocket server frame.
+
+    content: raw data"""
     data = [struct.pack('>B', 1 << 7 | 2)]
     prefix, content_len = _gen_data_len(False, content)
     if content_len == 0:
@@ -189,7 +215,8 @@ def gen_server_frame(content):
     return b''.join(data)
 
 
-def gen_close_frame(mask):
+# deprecated
+"""def gen_close_frame(mask):
     if mask:
         data = struct.pack('>B', 1 << 7 | 8)
         data += struct.pack('>B', 1 << 7)
@@ -198,7 +225,7 @@ def gen_close_frame(mask):
         data = struct.pack('>B', 1 << 7 | 8)
         data += struct.pack('>B', 0)
 
-    return data
+    return data"""
 
 
 # deprecated
@@ -226,7 +253,11 @@ def gen_close_frame(mask):
 
 
 # resolve websocket frame
-async def get_content(reader, run_on_server, mask_key=None):
+async def get_content(reader, run_on_server):
+    """Get content from websocket frame.
+
+    reader: stream reader
+    run_on_server: server flag"""
     try:
         data = await reader.readexactly(2)  # (FIN, RSV * 3, optcode)
 
@@ -289,6 +320,9 @@ async def get_content(reader, run_on_server, mask_key=None):
 
 
 def is_ip_addr(addr):
+    """ Detect addr type.
+
+    addr: received addr"""
     try:
         socket.inet_pton(socket.AF_INET6, addr.decode())
         return True
