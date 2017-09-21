@@ -9,11 +9,11 @@ from Cryptodome.Random import get_random_bytes
 
 class aes_gcm:
     def __init__(self, key, salt=None):
-        '''Create a new AES-GCM cipher.
+        """Create a new AES-GCM cipher.
 
         key: Your password like: passw0rd
         salt: a 16 bytes length byte string, if not provided a random salt will be used
-        nonce: a 8 bytes length byte string, if not provided a random nonce will be used'''
+        nonce: a 8 bytes length byte string, if not provided a random nonce will be used"""
 
         self.raw_key = key.encode()
         if not salt:
@@ -36,18 +36,18 @@ class aes_gcm:
         self.nonce += 1
 
     def encrypt(self, data):
-        '''Encrypt data return cipher
+        """Encrypt data return cipher.
 
-        data: raw data'''
+        data: raw data"""
         self._new()
         #Return (cpiher, MAC)
         return self.cipher.encrypt_and_digest(data)
 
     def decrypt(self, data, mac):
-        '''Decrypt data
+        """Decrypt data.
 
         data: cipher
-        mac: gmac'''
+        mac: gmac"""
         self._new()
         #Verify MAC, if matching, will return plain text or raise ValueError
         plain = self.cipher.decrypt_and_verify(data, mac)
