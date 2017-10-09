@@ -5,7 +5,6 @@ from aiodns.error import DNSError
 from asyncio import IncompleteReadError
 from cachetools import LRUCache
 
-
 try:
     import secrets
 except ImportError:

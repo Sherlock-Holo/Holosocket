@@ -22,8 +22,14 @@ except (ModuleNotFoundError, ImportError):  # develop mode
 
 
 class Server:
-    def __init__(self, server, server_port, key):
+    def __init__(self, server, v6_server, server_port, key):
         self.server = server
+        if not v6_server == None:
+            self.v6_server = v6_server
+            self.v6 = True
+        else:
+            self.v6 = False
+
         self.server_port = server_port
         self.key = key
 
@@ -136,6 +142,15 @@ class Server:
         await writer.drain()
 
         # connect to server
+        if self.v6:
+            try:
+                with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+                    s.connect((self.v6_server, self.server_port))
+
+                self.server = self.v6_server
+            except OSError:
+                pass
+
         try:
             r_reader, r_writer = await asyncio.open_connection(
                 self.server, self.server_port)
@@ -292,6 +307,11 @@ def main():
         style='{')
 
     SERVER = config['server']
+    try:
+        V6_SERVER = config['v6_server']
+    except KeyError:
+        V6_SERVER = None
+
     SERVER_PORT = config['server_port']
     LOCAL = config['local']
     PORT = config['local_port']
@@ -305,7 +325,7 @@ def main():
         logging.info('pure asyncio mode')
 
     loop = asyncio.get_event_loop()
-    server = Server(SERVER, SERVER_PORT, KEY)
+    server = Server(SERVER, V6_SERVER, SERVER_PORT, KEY)
     coro = asyncio.start_server(server.handle, LOCAL, PORT, loop=loop)
     server = loop.run_until_complete(coro)
 
