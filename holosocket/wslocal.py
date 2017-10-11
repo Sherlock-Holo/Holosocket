@@ -15,20 +15,20 @@ except ImportError:
 
 try:
     from . import utils
-    from .encrypt import aes_gcm
+    from .encrypt import Chacha20
 except (ModuleNotFoundError, ImportError):  # develop mode
     import utils
-    from encrypt import aes_gcm
+    from encrypt import Chacha20
 
 
 class Server:
     def __init__(self, server, v6_server, server_port, key):
         self.server = server
-        if not v6_server == None:
+        if not v6_server:
+            self.v6 = False
+        else:
             self.v6_server = v6_server
             self.v6 = True
-        else:
-            self.v6 = False
 
         self.server_port = server_port
         self.key = key
@@ -160,17 +160,13 @@ class Server:
             writer.close()
             return None
 
-        Encrypt = aes_gcm(self.key)
-        salt = Encrypt.salt
-        Decrypt = aes_gcm(self.key, salt)
+        Encrypt = Chacha20(self.key)
+        Decrypt = Chacha20(self.key)
 
         # send salt
         try:
-            r_writer.write(utils.gen_local_frame(salt))
-            await r_writer.drain()
-
-            data_to_send, tag = Encrypt.encrypt(data_to_send)
-            content = utils.gen_local_frame(data_to_send + tag)
+            data_to_send = Encrypt.encrypt(data_to_send)
+            content = utils.gen_local_frame(data_to_send)
             r_writer.write(content)
             await r_writer.drain()
 
@@ -223,8 +219,8 @@ class Server:
                     break
 
                 # send data
-                data, tag = cipher.encrypt(data)
-                content = utils.gen_local_frame(data + tag)
+                data = cipher.encrypt(data)
+                content = utils.gen_local_frame(data)
 
                 writer.write(content)
                 await writer.drain()
@@ -248,21 +244,14 @@ class Server:
     async def remote2sock(self, reader, writer, cipher):
         while True:
             try:
-                data = await utils.get_content(reader, False)
+                content = await utils.get_content(reader, False)
 
                 # close Connection
-                if not data:
+                if not content:
                     break
 
                 # send data
-                content, tag = data[:-16], data[-16:]
-
-                try:
-                    data = cipher.decrypt(content, tag)
-                except ValueError:
-                    logging.warn('detect attack')
-                    await asyncio.sleep(90)
-                    return None
+                data = cipher.decrypt(content)
 
                 writer.write(data)
                 await writer.drain()

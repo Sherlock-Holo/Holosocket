@@ -13,11 +13,11 @@ except ImportError:
 
 try:
     from . import utils
-    from .encrypt import aes_gcm
+    from .encrypt import Chacha20
     from .utils import Resolver
 except (ModuleNotFoundError, ImportError):  # develop mode
     import utils
-    from encrypt import aes_gcm
+    from encrypt import Chacha20
     from utils import Resolver
 
 
@@ -37,24 +37,8 @@ class Server:
         reader: stream reader
         writer: stream writer"""
         try:
-            # get salt
-            salt = await utils.get_content(reader, True)
-
-            if not salt:
-                logging.warn('conn close quickly, please notice it!')
-                await asyncio.sleep(90)
-                writer.close()
-                return None
-
-            if not len(salt) == 16:
-                logging.warn(
-                    'recv error salt {} bytes: {}'.format(len(salt), salt))
-                await asyncio.sleep(90)
-                writer.close()
-                return None
-
-            Encrypt = aes_gcm(self.key, salt)
-            Decrypt = aes_gcm(self.key, salt)
+            Encrypt = Chacha20(self.key)
+            Decrypt = Chacha20(self.key)
 
             # get target addr, port
             data_to_send = await utils.get_content(reader, True)
@@ -63,14 +47,7 @@ class Server:
                 writer.close()
                 return None
 
-            data, tag = data_to_send[:-16], data_to_send[-16:]
-            try:
-                content = Decrypt.decrypt(data, tag)
-            except ValueError:
-                logging.warn('detect attack')
-                asyncio.sleep(90)
-                writer.close()
-                return None
+            content = Decrypt.decrypt(data_to_send)
 
             addr_len = content[0]
             addr = content[1:1 + addr_len]
@@ -136,20 +113,14 @@ class Server:
         cipher: decrypt handler"""
         while True:
             try:
-                data = await utils.get_content(reader, True)
+                content = await utils.get_content(reader, True)
 
                 # close Connection
-                if not data:
+                if not content:
                     break
 
                 # send data
-                content, tag = data[:-16], data[-16:]
-                try:
-                    data = cipher.decrypt(content, tag)
-                except ValueError:
-                    logging.warn('detect attack')
-                    await asyncio.sleep(90)
-                    return None
+                data = cipher.decrypt(content)
 
                 writer.write(data)
                 await writer.drain()
@@ -185,8 +156,8 @@ class Server:
                     break
 
                 # send data
-                data, tag = cipher.encrypt(data)
-                content = utils.gen_server_frame(data + tag)
+                data = cipher.encrypt(data)
+                content = utils.gen_server_frame(data)
 
                 writer.write(content)
                 await writer.drain()
