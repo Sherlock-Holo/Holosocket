@@ -6,6 +6,7 @@ import functools
 import logging
 import socket
 import struct
+import websockets
 import yaml
 
 try:
@@ -32,6 +33,8 @@ class Server:
 
         self.server_port = server_port
         self.key = key
+
+        self.conn_pool = {}
 
     async def handle(self, reader, writer):
         try:
@@ -141,136 +144,15 @@ class Server:
         writer.write(b''.join(data))
         await writer.drain()
 
-        # connect to server
-        if self.v6:
-            try:
-                with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
-                    s.connect((self.v6_server, self.server_port))
+        if not self.conn_pool:
+            transport = {'coon_1': {}}
 
-                self.server = self.v6_server
-            except OSError:
-                pass
+    async def create_ws_conn(self):
+        transport = websockets.connect('ws://{}:{}'.format(self.server, self.server_port))
+        encrypt = Chacha20(self.key)
+        decrypt = Chacha20(self.key)
+        self.conn_pool['coon_{}'.format(len(self.conn_pool + 1))] = {'transport': transport}
 
-        try:
-            r_reader, r_writer = await asyncio.open_connection(
-                self.server, self.server_port)
-
-        except OSError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
-        Encrypt = Chacha20(self.key)
-        Decrypt = Chacha20(self.key)
-
-        # send salt
-        try:
-            data_to_send = Encrypt.encrypt(data_to_send)
-            content = utils.gen_local_frame(data_to_send)
-            r_writer.write(content)
-            await r_writer.drain()
-
-        except OSError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
-        except ConnectionResetError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
-        except BrokenPipeError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
-        except TimeoutError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
-        logging.debug('start relay')
-
-        s2r = asyncio.ensure_future(
-            self.sock2remote(reader, r_writer, Encrypt))
-
-        r2s = asyncio.ensure_future(
-            self.remote2sock(r_reader, writer, Decrypt))
-
-        s2r.add_done_callback(
-            functools.partial(self.close_transport, writer, r_writer))
-
-        r2s.add_done_callback(
-            functools.partial(self.close_transport, writer, r_writer))
-
-    def close_transport(self, writer, r_writer, future):
-        writer.close()
-        r_writer.close()
-        logging.debug('stop relay')
-
-    async def sock2remote(self, reader, writer, cipher):
-        while True:
-            try:
-                data = await reader.read(8192)
-
-                # close Connection
-                if not data:
-                    break
-
-                # send data
-                data = cipher.encrypt(data)
-                content = utils.gen_local_frame(data)
-
-                writer.write(content)
-                await writer.drain()
-
-            except OSError as e:
-                logging.error(e)
-                break
-
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
-
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            except TimeoutError as e:
-                logging.error(e)
-                break
-
-    async def remote2sock(self, reader, writer, cipher):
-        while True:
-            try:
-                content = await utils.get_content(reader, False)
-
-                # close Connection
-                if not content:
-                    break
-
-                # send data
-                data = cipher.decrypt(content)
-
-                writer.write(data)
-                await writer.drain()
-
-            except OSError as e:
-                logging.error(e)
-                break
-
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
-
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            except TimeoutError as e:
-                logging.error(e)
-                break
 
 
 def main():
