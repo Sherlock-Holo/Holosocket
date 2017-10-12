@@ -23,7 +23,7 @@ except (ModuleNotFoundError, ImportError):  # develop mode
 
 
 class Server:
-    def __init__(self, server, v6_server, server_port, key):
+    def __init__(self, server, v6_server, server_port, key, **kwargs):
         self.server = server
         if not v6_server:
             self.v6 = False
@@ -33,8 +33,12 @@ class Server:
 
         self.server_port = server_port
         self.key = key
+        try:
+            self.ttl = ttl
+        except NameError:
+            self.ttl = 20
 
-        self.conn_pool = {}
+        self.conn_pool = []
 
     async def handle(self, reader, writer):
         try:
@@ -144,30 +148,31 @@ class Server:
         writer.write(b''.join(data))
         await writer.drain()
 
-        queue = asyncio.Queue()
-        await self.son_join_in_conn(queue, writer)
-
-        while True:
-            data = await reader.read(8192)
-            if not data:
-                writer.close()
-                queue.put(None)
-                return None
-
-            await queue.put(data)
-
     async def create_ws_conn(self):
-        transport = await websockets.connect('ws://{}:{}'.format(self.server, self.server_port))
-        encrypt = Chacha20(self.key)
-        decrypt = Chacha20(self.key)
-        self.conn_pool['coon_{}'.format(len(self.conn_pool) + 1)] = {'transport': transport}
-        return self.conn_pool['coon_{}'.format(len(self.conn_pool))]
+        if self.v6:
+            try:
+                with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+                    s.connect((self.v6_server, self.server_port))
+                self.server = self.v6_server
+            except OSError:
+                pass
 
-    async def son_join_in_conn(self, queue, writer):
-        if not self.conn_pool:
-            ws_conn = await self.create_ws_conn()
-            ws_conn['son_{}'.format(len(ws_conn) - 1)] = (queue, writer)
 
+class Websocket_conn:
+    def __init__(self, key, ttl, server, server_port):
+        self.encrypt = Chacha20(key)
+        self.decrypt = Chacha20(key)
+        self.ttl = ttl
+        self.path = 'ws://{}:{}'.format(server, server_port)
+
+    async def create_conn(self):
+        self.transport = await websockets.connect(self.path)
+
+    def update_sock_reader(self, reader):
+        self.sock_reader = reader
+
+    async def relay(self):
+        pass
 
 
 def main():
