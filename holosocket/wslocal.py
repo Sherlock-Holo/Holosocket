@@ -144,14 +144,29 @@ class Server:
         writer.write(b''.join(data))
         await writer.drain()
 
-        if not self.conn_pool:
-            transport = {'coon_1': {}}
+        queue = asyncio.Queue()
+        await self.son_join_in_conn(queue, writer)
+
+        while True:
+            data = await reader.read(8192)
+            if not data:
+                writer.close()
+                queue.put(None)
+                return None
+
+            await queue.put(data)
 
     async def create_ws_conn(self):
-        transport = websockets.connect('ws://{}:{}'.format(self.server, self.server_port))
+        transport = await websockets.connect('ws://{}:{}'.format(self.server, self.server_port))
         encrypt = Chacha20(self.key)
         decrypt = Chacha20(self.key)
-        self.conn_pool['coon_{}'.format(len(self.conn_pool + 1))] = {'transport': transport}
+        self.conn_pool['coon_{}'.format(len(self.conn_pool) + 1)] = {'transport': transport}
+        return self.conn_pool['coon_{}'.format(len(self.conn_pool))]
+
+    async def son_join_in_conn(self, queue, writer):
+        if not self.conn_pool:
+            ws_conn = await self.create_ws_conn()
+            ws_conn['son_{}'.format(len(ws_conn) - 1)] = (queue, writer)
 
 
 
