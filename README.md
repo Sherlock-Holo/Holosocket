@@ -40,8 +40,14 @@ optional arguments:
 
 > ```
 > server: 127.0.0.2
+> # v6_server is optional, you can comment it to close this feature
+> v6_server: ::1
 > server_port: 1088
+> # If you don't want to custom dns server, just comment the dns content
+> dns:
+>     - 8.8.8.8
+>     - 2001:4860:4860::8888
 > local: 127.0.0.2
 > local_port: 1089
 > password: test
-> ```
+```
