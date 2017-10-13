@@ -164,15 +164,17 @@ class Websocket_conn:
         self.decrypt = Chacha20(key)
         self._ttl = ttl
         self.path = 'ws://{}:{}'.format(server, server_port)
-        self.using = True
+        self._using = True
         self.initiative_close = None
 
     async def create_conn(self):
         self.transport = await websockets.connect(self.path)
 
-    def update_sock(self, reader, writer):
+    def update(self, reader, writer):
         self.sock_reader = reader
         self.sock_writer = writer
+        asyncio.ensure_future(self.sock2remote())
+        asyncio.ensure_future(self.remote2sock())
 
     def kill_conn(self):
         self._ttl = -1
@@ -182,6 +184,10 @@ class Websocket_conn:
     @property
     def ttl(self):
         return self._ttl
+
+    @property
+    def using(self):
+        return self._using
 
     async def sock2remote(self):
         while True:
@@ -216,6 +222,7 @@ class Websocket_conn:
                         self.ttl -= 1
 
                     self.initiative_close = None
+                    self._using = False
                     return None
 
                 elif not data:
