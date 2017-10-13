@@ -164,6 +164,8 @@ class Websocket_conn:
         self.decrypt = Chacha20(key)
         self.ttl = ttl
         self.path = 'ws://{}:{}'.format(server, server_port)
+        self.using = True
+        self.initiative_close = None
 
     async def create_conn(self):
         self.transport = await websockets.connect(self.path)
@@ -171,8 +173,46 @@ class Websocket_conn:
     def update_sock_reader(self, reader):
         self.sock_reader = reader
 
-    async def relay(self):
-        pass
+    def kill_conn(self):
+        self.ttl = -1
+        self.sock_reader.close()
+        self.transport.close()
+
+    async def sock2remote(self):
+        while True:
+            try:
+                data = await self.sock_reader.read(8192)
+                if not data:
+                    await self.transport.send(b'\x00\xff')
+                    self.sock_reader.close()
+                    self.initiative_close = True
+                    return None
+
+                data = self.encrypt.encrypt(data)
+                await self.transport.send(data)
+
+            except OSError as e:
+                break
+
+            except ConnectionError as e:
+                break
+
+    async def remote2sock(self):
+        while True:
+            try:
+                data = await self.transport.recv()
+                if data == b'\x00\xff':
+                    if self.initiative_close:
+                        self.ttl -= 1
+                    else:
+                        await self.transport.send(b'\x00\xff')
+                        self.sock_reader.close()
+                        self.ttl -= 1
+                    return None
+
+                elif not data:
+                    self.kill_conn()
+                    return None
 
 
 def main():
