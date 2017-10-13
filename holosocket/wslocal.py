@@ -159,10 +159,10 @@ class Server:
 
 
 class Websocket_conn:
-    def __init__(self, key, ttl, server, server_port):
+    def __init__(self, key, server, server_port, ttl=10):
         self.encrypt = Chacha20(key)
         self.decrypt = Chacha20(key)
-        self.ttl = ttl
+        self._ttl = ttl
         self.path = 'ws://{}:{}'.format(server, server_port)
         self.using = True
         self.initiative_close = None
@@ -170,13 +170,18 @@ class Websocket_conn:
     async def create_conn(self):
         self.transport = await websockets.connect(self.path)
 
-    def update_sock_reader(self, reader):
+    def update_sock(self, reader, writer):
         self.sock_reader = reader
+        self.sock_writer = writer
 
     def kill_conn(self):
-        self.ttl = -1
+        self._ttl = -1
         self.sock_reader.close()
         self.transport.close()
+
+    @property
+    def ttl(self):
+        return self._ttl
 
     async def sock2remote(self):
         while True:
@@ -192,10 +197,10 @@ class Websocket_conn:
                 await self.transport.send(data)
 
             except OSError as e:
-                break
+                pass
 
             except ConnectionError as e:
-                break
+                pass
 
     async def remote2sock(self):
         while True:
@@ -204,15 +209,29 @@ class Websocket_conn:
                 if data == b'\x00\xff':
                     if self.initiative_close:
                         self.ttl -= 1
+
                     else:
                         await self.transport.send(b'\x00\xff')
                         self.sock_reader.close()
                         self.ttl -= 1
+
+                    self.initiative_close = None
                     return None
 
                 elif not data:
                     self.kill_conn()
                     return None
+
+                else:
+                    data = self.decrypt(data)
+                    self.sock_writer(data)
+                    await self.sock_writer.drain()
+
+            except OSError as e:
+                pass
+
+            except ConnectionError as e:
+                pass
 
 
 def main():
