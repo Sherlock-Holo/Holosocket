@@ -170,9 +170,11 @@ class Websocket_conn:
     async def create_conn(self):
         self.transport = await websockets.connect(self.path)
 
-    def update(self, reader, writer):
+    async def update(self, reader, writer, data_to_send):
         self.sock_reader = reader
         self.sock_writer = writer
+        await self.send_target_info(data_to_send)
+
         asyncio.ensure_future(self.sock2remote())
         asyncio.ensure_future(self.remote2sock())
 
@@ -180,6 +182,9 @@ class Websocket_conn:
         self._ttl = -1
         self.sock_reader.close()
         self.transport.close()
+
+    async def send_target_info(self, data_to_send):
+        self.transport.send(data_to_send)
 
     @property
     def ttl(self):
