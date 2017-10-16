@@ -208,10 +208,10 @@ class Websocket_conn:
                 await self.transport.send(data)
 
             except OSError as e:
-                pass
+                self.kill_conn()
 
             except ConnectionError as e:
-                pass
+                self.kill_conn()
 
     async def remote2sock(self):
         while True:
@@ -240,10 +240,10 @@ class Websocket_conn:
                     await self.sock_writer.drain()
 
             except OSError as e:
-                pass
+                self.kill_conn()
 
             except ConnectionError as e:
-                pass
+                self.kill_conn()
 
 
 def main():
