@@ -4,6 +4,7 @@ import asyncio
 import functools
 import logging
 import struct
+import websockets
 import yaml
 
 try:
@@ -31,21 +32,14 @@ class Server:
         resolver = Resolver(nameservers=nameservers)
         self.resolve = resolver.resolve
 
-    async def handle(self, reader, writer):
-        """Connection handler.
-
-        reader: stream reader
-        writer: stream writer"""
+    async def handle(self, transport, path):
+        """Connection handler."""
         try:
             Encrypt = Chacha20(self.key)
             Decrypt = Chacha20(self.key)
 
             # get target addr, port
-            data_to_send = await utils.get_content(reader, True)
-            # conn close
-            if not data_to_send:
-                writer.close()
-                return None
+            data_to_send = await transport.recv()
 
             content = Decrypt.decrypt(data_to_send)
 
@@ -55,49 +49,35 @@ class Server:
                 try:
                     addr = await self.resolve(addr)
                 except utils.DNSError as e:
-                    logging.error(e)
-                    writer.close()
-                    return None
+                    pass
+
             logging.debug('addr is {}'.format(addr))
             _port = content[-2:]
             port = struct.unpack('>H', _port)[0]
 
         except OSError as e:
-            logging.error(e)
-            writer.close()
-            return None
+            pass
 
         except ConnectionResetError as e:
-            logging.error(e)
-            writer.close()
-            return None
+            pass
 
-        except BrokenPipeError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
-        except TimeoutError as e:
-            logging.error(e)
-            writer.close()
-            return None
+        except websockets.ConnectionClosed as e:
+            pass
 
         # connect to target
         try:
             r_reader, r_writer = await asyncio.open_connection(addr, port)
 
         except OSError as e:
-            logging.error(e)
-            writer.close()
-            return None
+            pass
 
         logging.debug('start relay')
 
         s2r = asyncio.ensure_future(
-            self.sock2remote(reader, r_writer, Decrypt))
+            self.sock2remote(reader, transport, Decrypt))
 
         r2s = asyncio.ensure_future(
-            self.remote2sock(r_reader, writer, Encrypt))
+            self.remote2sock(transport, writer, Encrypt))
 
         s2r.add_done_callback(
             functools.partial(self.close_transport, writer, r_writer))
@@ -113,7 +93,7 @@ class Server:
         cipher: decrypt handler"""
         while True:
             try:
-                content = await utils.get_content(reader, True)
+                content = await transport.recv()
 
                 # close Connection
                 if not content:
@@ -126,20 +106,13 @@ class Server:
                 await writer.drain()
 
             except OSError as e:
-                logging.error(e)
-                break
+                pass
 
             except ConnectionResetError as e:
-                logging.error(e)
-                break
+                pass
 
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
-
-            except TimeoutError as e:
-                logging.error(e)
-                break
+            except websockets.ConnectionClosed as e:
+                pass
 
     async def remote2sock(self, reader, writer, cipher):
         """Relay handler (remote -> server).
@@ -234,8 +207,7 @@ def main():
 
     loop = asyncio.get_event_loop()
     server = Server(KEY, nameservers=DNS)
-    coro = asyncio.start_server(server.handle, SERVER, SERVER_PORT, loop=loop)
-    server = loop.run_until_complete(coro)
+    loop.run_until_complete(websockets.serve(server.handle, SERVER, SERVER_PORT))
 
     try:
         loop.run_forever()
