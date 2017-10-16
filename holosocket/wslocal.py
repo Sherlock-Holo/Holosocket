@@ -144,21 +144,17 @@ class Server:
         # connect to server
         if self.v6:
             try:
-                with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
-                    s.connect((self.v6_server, self.server_port))
-
-                self.server = self.v6_server
+                r_reader, r_writer = await asyncio.open_connection(
+                    self.v6_server, self.server_port)
             except OSError:
-                pass
+                try:
+                    r_reader, r_writer = await asyncio.open_connection(
+                        self.server, self.server_port)
 
-        try:
-            r_reader, r_writer = await asyncio.open_connection(
-                self.server, self.server_port)
-
-        except OSError as e:
-            logging.error(e)
-            writer.close()
-            return None
+                except OSError as e:
+                    logging.error(e)
+                    writer.close()
+                    return None
 
         Encrypt = Chacha20(self.key)
         Decrypt = Chacha20(self.key)
