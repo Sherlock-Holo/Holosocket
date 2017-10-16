@@ -156,6 +156,16 @@ class Server:
                     writer.close()
                     return None
 
+        else:
+            try:
+                r_reader, r_writer = await asyncio.open_connection(
+                    self.server, self.server_port)
+
+            except OSError as e:
+                logging.error(e)
+                writer.close()
+                return None
+
         Encrypt = Chacha20(self.key)
         Decrypt = Chacha20(self.key)
 
