@@ -179,7 +179,7 @@ class Websocket_conn:
     async def update(self, reader, writer, data_to_send):
         self.sock_reader = reader
         self.sock_writer = writer
-        await self.send_target_info(data_to_send)
+        await self.send_target_info(self.encrypt.encrypt(data_to_send))
 
         asyncio.ensure_future(self.sock2remote())
         asyncio.ensure_future(self.remote2sock())
@@ -220,6 +220,9 @@ class Websocket_conn:
             except ConnectionError as e:
                 self.kill_conn()
 
+            except websockets.ConnectionClosed as e:
+                self.kill_conn()
+
     async def remote2sock(self):
         while True:
             try:
@@ -251,6 +254,9 @@ class Websocket_conn:
                 self.kill_conn()
 
             except ConnectionError as e:
+                self.kill_conn()
+
+            except websockets.ConnectionClosed as e:
                 self.kill_conn()
 
 
