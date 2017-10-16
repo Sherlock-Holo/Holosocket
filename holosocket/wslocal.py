@@ -184,13 +184,14 @@ class Websocket_conn:
         asyncio.ensure_future(self.sock2remote())
         asyncio.ensure_future(self.remote2sock())
 
+    async def send_target_info(self, data_to_send):
+        await self.transport.send(data_to_send)
+
     def kill_conn(self):
         self._ttl = -1
-        self.sock_reader.close()
+        self.sock_writer.close()
         self.transport.close()
-
-    async def send_target_info(self, data_to_send):
-        self.transport.send(data_to_send)
+        self._using = False
 
     @property
     def ttl(self):
@@ -206,7 +207,7 @@ class Websocket_conn:
                 data = await self.sock_reader.read(8192)
                 if not data:
                     await self.transport.send(b'\x00\xff')
-                    self.sock_reader.close()
+                    self.sock_writer.close()
                     self.initiative_close = True
                     return None
 
@@ -225,11 +226,12 @@ class Websocket_conn:
                 data = await self.transport.recv()
                 if data == b'\x00\xff':
                     if self.initiative_close:
+                        self.sock_writer.close()
                         self.ttl -= 1
 
                     else:
                         await self.transport.send(b'\x00\xff')
-                        self.sock_reader.close()
+                        self.sock_writer.close()
                         self.ttl -= 1
 
                     self.initiative_close = None
