@@ -8,6 +8,7 @@ import socket
 import struct
 import websockets
 import yaml
+from random import choice
 
 try:
     from yaml import CLoader as Loader
@@ -145,17 +146,22 @@ class Server:
             socket.inet_aton('0.0.0.0'),
             struct.pack('>H', 0)
         )
-        writer.write(b''.join(data))
-        await writer.drain()
 
-    async def create_ws_conn(self):
-        if self.v6:
-            try:
-                with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
-                    s.connect((self.v6_server, self.server_port))
-                self.server = self.v6_server
-            except OSError:
-                pass
+        if not self.conn_pool:
+            ws_conn = Websocket_conn(self.key, self.server, self.server_port)
+            self.conn_pool.append(ws_conn)
+            await ws_conn.create_conn()
+
+        else:
+            while True:
+                ws_conn = choice(self.conn_pool)
+                if not ws_conn.using:
+                    if ws_conn.ttl <= 0:
+                        self.conn_pool.pop(ws_conn)
+                    else:
+                        break
+
+        asyncio.ensure_future(ws_conn.update(reader, writer, b''.join(data)))
 
 
 class Websocket_conn:
