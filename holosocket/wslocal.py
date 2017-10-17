@@ -2,7 +2,7 @@
 
 import argparse
 import asyncio
-import functools
+# import functools
 import logging
 import socket
 import struct
@@ -17,10 +17,10 @@ except ImportError:
     from yaml import Loader
 
 try:
-    from . import utils
+    # from . import utils
     from .encrypt import Chacha20
 except (ModuleNotFoundError, ImportError):  # develop mode
-    import utils
+    # import utils
     from encrypt import Chacha20
 
 
@@ -162,7 +162,7 @@ class Server:
                     ws_conn = choice(self.conn_pool)
                     if not ws_conn.using:
                         if ws_conn.ttl <= 0:
-                            self.conn_pool.pop(ws_conn)
+                            self.conn_pool.pop(self.conn_pool.index(ws_conn))
                         else:
                             break
 
