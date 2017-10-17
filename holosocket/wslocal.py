@@ -150,13 +150,26 @@ class Server:
             await ws_conn.create_conn()
 
         else:
-            while True:
-                ws_conn = choice(self.conn_pool)
-                if not ws_conn.using:
-                    if ws_conn.ttl <= 0:
-                        self.conn_pool.pop(ws_conn)
-                    else:
-                        break
+            for ws_conn in self.conn_pool:
+                if ws_conn.using:
+                    all_conn_busy = True
+                else:
+                    all_conn_busy = False
+                    break
+
+            if not all_conn_busy:
+                while True:
+                    ws_conn = choice(self.conn_pool)
+                    if not ws_conn.using:
+                        if ws_conn.ttl <= 0:
+                            self.conn_pool.pop(ws_conn)
+                        else:
+                            break
+
+            else:
+                ws_conn = Websocket_conn(self.key, self.server, self.server_port)
+                self.conn_pool.append(ws_conn)
+                await ws_conn.create_conn()
 
         asyncio.ensure_future(ws_conn.update(reader, writer, b''.join(data)))
 
