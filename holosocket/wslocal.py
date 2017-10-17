@@ -36,7 +36,7 @@ class Server:
         self.server_port = server_port
         self.key = key
 
-        self.conn_pool = set()
+        self.conn_pool = []
 
     async def handle(self, reader, writer):
         try:
@@ -146,7 +146,7 @@ class Server:
 
         if not self.conn_pool:
             ws_conn = Websocket_conn(self.key, self.server, self.server_port)
-            self.conn_pool.add(ws_conn)
+            self.conn_pool.append(ws_conn)
             await ws_conn.create_conn()
 
         else:
@@ -162,13 +162,13 @@ class Server:
                     ws_conn = choice(self.conn_pool)
                     if not ws_conn.using:
                         if ws_conn.ttl <= 0:
-                            self.conn_pool.remove(ws_conn)
+                            self.conn_pool.pop(ws_conn)
                         else:
                             break
 
             else:
                 ws_conn = Websocket_conn(self.key, self.server, self.server_port)
-                self.conn_pool.add(ws_conn)
+                self.conn_pool.append(ws_conn)
                 await ws_conn.create_conn()
 
         asyncio.ensure_future(ws_conn.update(reader, writer, b''.join(data)))
