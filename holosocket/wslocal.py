@@ -206,7 +206,7 @@ class Websocket_conn:
             try:
                 data = await self.sock_reader.read(8192)
                 if not data:
-                    await self.transport.send(b'\x00\xff')
+                    await self.transport.send(self.encrypt.encrypt(b'\x00\xff'))
                     self.sock_writer.close()
                     self.initiative_close = True
                     return None
@@ -233,7 +233,7 @@ class Websocket_conn:
                         self.ttl -= 1
 
                     else:
-                        await self.transport.send(b'\x00\xff')
+                        await self.transport.send(self.encrypt.encrypt(b'\x00\xff'))
                         self.sock_writer.close()
                         self.ttl -= 1
 
@@ -247,7 +247,7 @@ class Websocket_conn:
 
                 else:
                     data = self.decrypt(data)
-                    self.sock_writer(data)
+                    self.sock_writer.write(data)
                     await self.sock_writer.drain()
 
             except OSError as e:
