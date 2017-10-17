@@ -35,52 +35,54 @@ class Server:
 
     async def handle(self, transport, path):
         """Connection handler."""
-        initiative_close = None
-        try:
-            Encrypt = Chacha20(self.key)
-            Decrypt = Chacha20(self.key)
+        while True:
+            initiative_close = None
+            try:
+                Encrypt = Chacha20(self.key)
+                Decrypt = Chacha20(self.key)
 
-            # get target addr, port
-            data_to_send = await transport.recv()
+                # get target addr, port
+                data_to_send = await transport.recv()
 
-            content = Decrypt.decrypt(data_to_send)
+                content = Decrypt.decrypt(data_to_send)
 
-            addr_len = content[0]
-            addr = content[1:1 + addr_len]
-            if not utils.is_ip_addr(addr):
-                try:
-                    addr = await self.resolve(addr)
-                except utils.DNSError as e:
-                    pass
+                addr_len = content[0]
+                addr = content[1:1 + addr_len]
+                if not utils.is_ip_addr(addr):
+                    try:
+                        addr = await self.resolve(addr)
+                    except utils.DNSError as e:
+                        pass
 
-            logging.debug('addr is {}'.format(addr))
-            _port = content[-2:]
-            port = struct.unpack('>H', _port)[0]
+                logging.debug('addr is {}'.format(addr))
+                _port = content[-2:]
+                port = struct.unpack('>H', _port)[0]
 
-        except OSError as e:
-            pass
+            except WsConnectionClosed as e:
+                await transport.close()
+                return None
 
-        except ConnectionResetError as e:
-            pass
+            # connect to target
+            try:
+                r_reader, r_writer = await asyncio.open_connection(addr, port)
+                remote = Remote(r_reader, r_writer)
 
-        except WsConnectionClosed as e:
-            pass
+            except OSError as e:
+                await transport.close()
+                return None
 
-        # connect to target
-        try:
-            r_reader, r_writer = await asyncio.open_connection(addr, port)
-            remote = Remote(r_reader, r_writer)
+            logging.debug('start relay')
 
-        except OSError as e:
-            pass
+            s2r = asyncio.ensure_future(
+                self.sock2remote(transport, remote, Encrypt, Decrypt, initiative_close))
 
-        logging.debug('start relay')
+            r2s = asyncio.ensure_future(
+                self.remote2sock(transport, remote, Encrypt, Decrypt, initiative_close))
 
-        s2r = asyncio.ensure_future(
-            self.sock2remote(transport, remote, Encrypt, Decrypt, initiative_close))
-
-        r2s = asyncio.ensure_future(
-            self.remote2sock(transport, remote, Encrypt, Decrypt, initiative_close))
+            dones, pending = await asyncio.wait((s2r, r2s))
+            for done in dones:
+                if done.result() == CLOSED or CLOSING:
+                    return None
 
     async def sock2remote(self, transport, remote, encrypt, decrypt, initiative_close):
         while True:
@@ -89,7 +91,7 @@ class Server:
                 # Changed in websockets version 3.0: recv() used to return None
                 # instead.
                 # if not data:
-                #     transport.close()
+                #     await transport.close()
                 #     remote.close()
                 #     return None
 
@@ -109,9 +111,9 @@ class Server:
 
             # for websocket connect
             except WsConnectionClosed as e:
-                transport.close()
+                await transport.close()
                 remote.close()
-                return None
+                return transport.state_name
 
             except ConnectionError as e:
                 remote.close()
@@ -135,8 +137,8 @@ class Server:
             # for websocket connect
             except WsConnectionClosed as e:
                 remote.close()
-                transport.close()
-                return None
+                await transport.close()
+                return transport.state_name
 
             except ConnectionError as e:
                 remote.close()
