@@ -208,7 +208,8 @@ def main():
 
     loop = asyncio.get_event_loop()
     server = Server(KEY, nameservers=DNS)
-    loop.run_until_complete(websockets.serve(server.handle, SERVER, SERVER_PORT))
+    coro = websockets.serve(server.handle, SERVER, SERVER_PORT)
+    loop.run_until_complete(coro)
 
     try:
         loop.run_forever()
@@ -216,7 +217,7 @@ def main():
     except KeyboardInterrupt:
         pass
 
-    server.close()
+    coro.server.close()
     loop.run_until_complete(server.wait_closed())
     loop.close()
 
