@@ -143,8 +143,11 @@ class Server:
             socket.inet_aton('0.0.0.0'),
             struct.pack('>H', 0)
         )
+        writer.write(b''.join(data))
+        await writer.drain()
 
         if not self.conn_pool:
+            logging.debug('conn_pool is empty')
             ws_conn = Websocket_conn(self.key, self.server, self.server_port)
             self.conn_pool.append(ws_conn)
             await ws_conn.create_conn()
@@ -159,6 +162,7 @@ class Server:
 
             if not all_conn_busy:
                 while True:
+                    logging.debug('conn_pool: {}'.format(self.conn_pool))
                     ws_conn = choice(self.conn_pool)
                     if not ws_conn.using:
                         if ws_conn.ttl <= 0:
@@ -171,6 +175,7 @@ class Server:
                 self.conn_pool.append(ws_conn)
                 await ws_conn.create_conn()
 
+        await ws_conn.update(reader, writer, data_to_send)
         asyncio.ensure_future(ws_conn.update(reader, writer, b''.join(data)))
 
 
@@ -216,9 +221,9 @@ class Websocket_conn:
             try:
                 data = await self.sock_reader.read(8192)
                 if not data:
-                    await self.transport.send(self.encrypt.encrypt(b'\x00\xff'))
                     self.sock_writer.close()
                     self.initiative_close = True
+                    await self.transport.send(self.encrypt.encrypt(b'\x00\xff'))
                     return None
 
                 data = self.encrypt.encrypt(data)
@@ -226,48 +231,50 @@ class Websocket_conn:
 
             except OSError as e:
                 await self.kill_conn()
+                return None
 
             except ConnectionError as e:
                 await self.kill_conn()
+                return None
 
             except WsConnectionClosed as e:
                 await self.kill_conn()
+                return None
 
     async def remote2sock(self):
         while True:
             try:
                 data = await self.transport.recv()
+                data = self.decrypt.decrypt(data)
                 if data == b'\x00\xff':
                     if self.initiative_close:
                         self.sock_writer.close()
-                        self.ttl -= 1
 
                     else:
                         await self.transport.send(self.encrypt.encrypt(b'\x00\xff'))
                         self.sock_writer.close()
-                        self.ttl -= 1
 
+                    self.ttl -= 1
                     self.initiative_close = None
                     self._using = False
                     return None
 
-                elif not data:
-                    await self.kill_conn()
-                    return None
-
                 else:
-                    data = self.decrypt(data)
+                    data = self.decrypt.decrypt(data)
                     self.sock_writer.write(data)
                     await self.sock_writer.drain()
 
             except OSError as e:
                 await self.kill_conn()
+                return None
 
             except ConnectionError as e:
                 await self.kill_conn()
+                return None
 
             except WsConnectionClosed as e:
                 await self.kill_conn()
+                return None
 
 
 def main():

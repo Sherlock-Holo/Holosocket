@@ -48,13 +48,13 @@ class Server:
 
                 addr_len = content[0]
                 addr = content[1:1 + addr_len]
+                logging.debug('raw addr is {}'.format(addr))
                 if not utils.is_ip_addr(addr):
                     try:
                         addr = await self.resolve(addr)
                     except utils.DNSError as e:
                         pass
 
-                logging.debug('addr is {}'.format(addr))
                 _port = content[-2:]
                 port = struct.unpack('>H', _port)[0]
 
@@ -218,7 +218,7 @@ def main():
         pass
 
     coro.server.close()
-    loop.run_until_complete(server.wait_closed())
+    # loop.run_until_complete(coro.server.close())
     loop.close()
 
 
