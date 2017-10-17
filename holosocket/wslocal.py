@@ -9,6 +9,7 @@ import struct
 import websockets
 import yaml
 from random import choice
+from websockets.exceptions import ConnectionClosed as WsConnectionClosed
 
 try:
     from yaml import CLoader as Loader
@@ -220,7 +221,7 @@ class Websocket_conn:
             except ConnectionError as e:
                 self.kill_conn()
 
-            except websockets.ConnectionClosed as e:
+            except WsConnectionClosed as e:
                 self.kill_conn()
 
     async def remote2sock(self):
@@ -256,7 +257,7 @@ class Websocket_conn:
             except ConnectionError as e:
                 self.kill_conn()
 
-            except websockets.ConnectionClosed as e:
+            except WsConnectionClosed as e:
                 self.kill_conn()
 
 
