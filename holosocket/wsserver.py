@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
-import functools
+# import functools
 import logging
 import struct
 import websockets
@@ -81,7 +81,7 @@ class Server:
 
             dones, pending = await asyncio.wait((s2r, r2s))
             for done in dones:
-                if done.result() == CLOSED or CLOSING:
+                if done.result() == 'CLOSED' or 'CLOSING':
                     return None
 
     async def sock2remote(self, transport, remote, encrypt, decrypt, initiative_close):
