@@ -6,6 +6,7 @@ import logging
 import struct
 import websockets
 import yaml
+from websockets.exceptions import ConnectionClosed as WsConnectionClosed
 
 try:
     from yaml import CLoader as Loader
@@ -62,7 +63,7 @@ class Server:
         except ConnectionResetError as e:
             pass
 
-        except websockets.ConnectionClosed as e:
+        except WsConnectionClosed as e:
             pass
 
         # connect to target
@@ -85,10 +86,12 @@ class Server:
         while True:
             try:
                 data = await transport.recv()
-                if not data:
-                    transport.close()
-                    remote.close()
-                    return None
+                # Changed in websockets version 3.0: recv() used to return None
+                # instead.
+                # if not data:
+                #     transport.close()
+                #     remote.close()
+                #     return None
 
                 data = decrypt.decrypt(data)
                 if data == b'\x00\xff':
@@ -104,6 +107,17 @@ class Server:
                 else:
                     await remote.write(data)
 
+            # for websocket connect
+            except WsConnectionClosed as e:
+                transport.close()
+                remote.close()
+                return None
+
+            except ConnectionError as e:
+                remote.close()
+                await transport.send(encrypt.encrypt(b'\x00\xff'))
+                initiative_close = True
+                return None
 
     async def remote2sock(self, transport, remote, encrypt, decrypt, initiative_close):
         while True:
@@ -112,12 +126,23 @@ class Server:
                 if not data:
                     remote.close()
                     initiative_close = True
-                    await transport.send(b'\x00\xff')
+                    await transport.send(encrypt.encrypt(b'\x00\xff'))
                     return None
 
-                else:
-                    data = encrypt.encrypt(data)
-                    await transport.send(data)
+                data = encrypt.encrypt(data)
+                await transport.send(data)
+
+            # for websocket connect
+            except WsConnectionClosed as e:
+                remote.close()
+                transport.close()
+                return None
+
+            except ConnectionError as e:
+                remote.close()
+                initiative_close = True
+                await transport.send(encrypt.encrypt(b'\x00\xff'))
+                return None
 
 
 class Remote:
