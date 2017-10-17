@@ -34,6 +34,7 @@ class Server:
 
     async def handle(self, transport, path):
         """Connection handler."""
+        initiative_close = None
         try:
             Encrypt = Chacha20(self.key)
             Decrypt = Chacha20(self.key)
@@ -67,6 +68,7 @@ class Server:
         # connect to target
         try:
             r_reader, r_writer = await asyncio.open_connection(addr, port)
+            remote = Remote(r_reader, r_writer)
 
         except OSError as e:
             pass
@@ -74,92 +76,64 @@ class Server:
         logging.debug('start relay')
 
         s2r = asyncio.ensure_future(
-            self.sock2remote(reader, transport, Decrypt))
+            self.sock2remote(transport, remote, Encrypt, Decrypt, initiative_close))
 
         r2s = asyncio.ensure_future(
-            self.remote2sock(transport, writer, Encrypt))
+            self.remote2sock(transport, remote, Encrypt, Decrypt, initiative_close))
 
-        s2r.add_done_callback(
-            functools.partial(self.close_transport, writer, r_writer))
-
-        r2s.add_done_callback(
-            functools.partial(self.close_transport, writer, r_writer))
-
-    async def sock2remote(self, reader, writer, cipher):
-        """Relay handler (local -> remote).
-
-        reader: stream reader
-        writer: stream writer
-        cipher: decrypt handler"""
+    async def sock2remote(self, transport, remote, encrypt, decrypt, initiative_close):
         while True:
             try:
-                content = await transport.recv()
-
-                # close Connection
-                if not content:
-                    break
-
-                # send data
-                data = cipher.decrypt(content)
-
-                writer.write(data)
-                await writer.drain()
-
-            except OSError as e:
-                pass
-
-            except ConnectionResetError as e:
-                pass
-
-            except websockets.ConnectionClosed as e:
-                pass
-
-    async def remote2sock(self, reader, writer, cipher):
-        """Relay handler (remote -> server).
-
-        reader: stream reader
-        writer: stream writer
-        cipher: encrypt handler"""
-        while True:
-            try:
-                data = await reader.read(8192)
-
-                # close Connection
+                data = await transport.recv()
                 if not data:
-                    break
+                    transport.close()
+                    remote.close()
+                    return None
 
-                # send data
-                data = cipher.encrypt(data)
-                content = utils.gen_server_frame(data)
+                data = decrypt.decrypt(data)
+                if data == b'\x00\xff':
+                    if initiative_close:
+                        return None
+                    else:
+                        await transport.send(encrypt.encrypt(b'\x00\xff'))
+                        initiative_close = None
+                        return None
 
-                writer.write(content)
-                await writer.drain()
+                    remote.close()
 
-            except OSError as e:
-                logging.error(e)
-                break
+                else:
+                    await remote.write(data)
 
-            except ConnectionResetError as e:
-                logging.error(e)
-                break
 
-            except BrokenPipeError as e:
-                logging.error(e)
-                break
+    async def remote2sock(self, transport, remote, encrypt, decrypt, initiative_close):
+        while True:
+            try:
+                data = await remote.read(8192)
+                if not data:
+                    remote.close()
+                    initiative_close = True
+                    await transport.send(b'\x00\xff')
+                    return None
 
-            except TimeoutError as e:
-                logging.error(e)
-                break
+                else:
+                    data = encrypt.encrypt(data)
+                    await transport.send(data)
 
-    def close_transport(self, writer, r_writer, future):
-        """Close transport.
 
-        writer: sock stream writer
-        r_writer: remote stream writer
-        future: prepare for `functools.partial`"""
-        writer.close()
-        r_writer.close()
-        logging.debug('stop relay')
+class Remote:
+    def __init__(self, reader, writer):
+        self._reader = reader
+        self._writer = writer
+
+    async def read(self, n):
+        return await self._reader.read(n)
+
+    async def write(self, data):
+        self._writer.write(data)
+        await self.writer.drain()
+
+    def close(self):
+        self._writer.close()
 
 
 def main():
