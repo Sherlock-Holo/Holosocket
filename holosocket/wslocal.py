@@ -35,10 +35,6 @@ class Server:
 
         self.server_port = server_port
         self.key = key
-        try:
-            self.ttl = ttl
-        except NameError:
-            self.ttl = 20
 
         self.conn_pool = []
 
