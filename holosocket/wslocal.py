@@ -188,10 +188,10 @@ class Websocket_conn:
     async def send_target_info(self, data_to_send):
         await self.transport.send(data_to_send)
 
-    def kill_conn(self):
+    async def kill_conn(self):
         self._ttl = -1
         self.sock_writer.close()
-        self.transport.close()
+        await self.transport.close()
         self._using = False
 
     @property
@@ -216,13 +216,13 @@ class Websocket_conn:
                 await self.transport.send(data)
 
             except OSError as e:
-                self.kill_conn()
+                await self.kill_conn()
 
             except ConnectionError as e:
-                self.kill_conn()
+                await self.kill_conn()
 
             except WsConnectionClosed as e:
-                self.kill_conn()
+                await self.kill_conn()
 
     async def remote2sock(self):
         while True:
@@ -243,7 +243,7 @@ class Websocket_conn:
                     return None
 
                 elif not data:
-                    self.kill_conn()
+                    await self.kill_conn()
                     return None
 
                 else:
@@ -252,13 +252,13 @@ class Websocket_conn:
                     await self.sock_writer.drain()
 
             except OSError as e:
-                self.kill_conn()
+                await self.kill_conn()
 
             except ConnectionError as e:
-                self.kill_conn()
+                await self.kill_conn()
 
             except WsConnectionClosed as e:
-                self.kill_conn()
+                await self.kill_conn()
 
 
 def main():
