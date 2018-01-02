@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import functools
 import logging
+import socket
 import struct
 import yaml
 
@@ -36,6 +37,9 @@ class Server:
 
         reader: stream reader
         writer: stream writer"""
+
+        writer.get_extra_info('socket').setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
         try:
             Encrypt = Chacha20(self.key)
             Decrypt = Chacha20(self.key)
@@ -77,11 +81,6 @@ class Server:
             writer.close()
             return None
 
-        except TimeoutError as e:
-            logging.error(e)
-            writer.close()
-            return None
-
         # connect to target
         try:
             r_reader, r_writer = await asyncio.open_connection(addr, port)
@@ -90,6 +89,8 @@ class Server:
             logging.error(e)
             writer.close()
             return None
+
+        r_writer.get_extra_info('socket').setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
         logging.debug('start relay')
 
